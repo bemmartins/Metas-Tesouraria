@@ -1018,92 +1018,113 @@ async function exportPdf(){
   if(!window.jspdf){showMsg("A biblioteca do PDF não carregou. Recarregue a página.",true);return}
   const {rs,s}=view; const r=recStats(rs);
   const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
-  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(); let y=44;
-  const ink=[19,32,42],mut=[89,106,119],okc=[28,122,75],badc=[179,49,42],acc=[1,80,121];
-  const head={fillColor:acc,textColor:255,fontStyle:"bold",fontSize:8.5};
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(), L=40, CW=W-80;
+  const ink=[19,32,42],mut=[89,106,119],okc=[28,122,75],badc=[179,49,42],acc=[1,80,121],line=[213,222,229];
+  const head={fillColor:acc,textColor:255,fontStyle:"bold",fontSize:8,cellPadding:{top:4,bottom:4,left:5,right:5}};
+  const body={fontSize:8,cellPadding:{top:3,bottom:3,left:5,right:5},textColor:ink,lineColor:line,lineWidth:.4};
   const colorBy=(hdr,meta)=>d=>{if(d.section!=="body")return;const h=d.table.head[0]&&d.table.head[0].cells[d.column.index];if(h&&h.raw===hdr){const p=parseFloat(String(d.cell.raw).replace(",","."))/100;if(!isNaN(p)){d.cell.styles.textColor=p>=meta/100?okc:badc;d.cell.styles.fontStyle="bold"}}};
-  const both=d=>{colorBy("Conciliação",st.meta)(d);colorBy("Receita identificada",st.metaR)(d)};
-  const sect=(t,need=90)=>{if(y>H-need){doc.addPage();y=44}doc.setFont("helvetica","bold");doc.setFontSize(12);doc.setTextColor(...ink);doc.text(t,40,y);y+=8};
-  doc.setFillColor(...acc);doc.rect(0,0,W,6,"F");if(BRAND.logo){try{doc.addImage(BRAND.logo,"JPEG",W-40-38,22,38,38)}catch(_){}}
-  doc.setFont("helvetica","bold");doc.setFontSize(18);doc.setTextColor(...acc);doc.text("Metas – Tesouraria",40,y);
-  y+=16;doc.setFont("helvetica","normal");doc.setFontSize(9.5);doc.setTextColor(...mut);
-  const fdesc=[st.f.de||st.f.ate?`período ${st.f.de?st.f.de.split("-").reverse().join("/"):"início"} a ${st.f.ate?st.f.ate.split("-").reverse().join("/"):"hoje"}`:"",st.f.tipo?"tipo "+st.f.tipo:"",st.f.analista?"analista "+st.f.analista:""].filter(Boolean).join(" · ");
-  doc.text(`${BRAND.org} · ${st.isSample?"DADOS DE EXEMPLO · ":""}${scopeLabel().replace(" · com filtros","")}${fdesc?" · "+fdesc:""} · gerado em ${new Date().toLocaleString("pt-BR")}`,40,y);
-  y+=16;
-  const bw=(W-80-16)/2;
-  const drawBox=(x,title,yes,total,meta,unit,pendVal)=>{
-    const pct=total?yes/total:0, ok=pct>=meta/100, g=needFor(yes,total,meta), pend=total-yes, col=ok?okc:badc;
-    doc.setFillColor(...(!total?[246,248,247]:ok?[223,241,230]:[250,229,226]));doc.setDrawColor(...(!total?[216,223,219]:col));doc.roundedRect(x,y,bw,112,6,6,"FD");
-    doc.setFont("helvetica","bold");doc.setFontSize(11);doc.setTextColor(...ink);doc.text(title,x+14,y+20);
-    if(!total){doc.setFont("helvetica","normal");doc.setFontSize(10);doc.setTextColor(...mut);doc.text("Sem dados com os filtros atuais.",x+14,y+44);return}
-    doc.setTextColor(...col);doc.setFontSize(30);doc.text(fmtPct(pct),x+14,y+56);
-    doc.setFontSize(11);doc.text(ok?"Dentro da meta":`ALERTA: abaixo de ${meta}%`,x+170,y+40);
-    doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...ink);
-    doc.text(`${fmtInt(yes)} de ${fmtInt(total)} ${unit} · faltam ${fmtPct(1-pct)} para 100%`,x+170,y+54);
-    doc.text(ok?`Meta de ${meta}%: folga de ${fmtInt(g.folga)}`:`Para a meta de ${meta}%: faltam ${fmtInt(g.need)}`,x+14,y+80);
-    doc.text(pend?`Para 100%: faltam ${fmtInt(pend)}${pendVal?" · "+fmtBRL(pendVal):""}`:"100%: nada pendente",x+14,y+96);
+  const both=d=>{colorBy("Conciliação",st.meta)(d);colorBy("Receita ident.",st.metaR)(d);colorBy("Identificação",st.metaR)(d);colorBy("% com",st.metaR)(d)};
+  const fit=(t,w)=>{t=String(t);while(t.length>3&&doc.getTextWidth(t)>w)t=t.slice(0,-2);return t};
+  let y=0;
+  const top=(sub)=>{
+    doc.setFillColor(...acc);doc.rect(0,0,W,54,"F");doc.setFillColor(47,134,181);doc.rect(0,54,W,3,"F");
+    let tx=L; if(BRAND.logo){try{doc.addImage(BRAND.logo,"JPEG",L,10,34,34);tx=L+44}catch(_){}}
+    doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(17);doc.text("Metas – Tesouraria",tx,30);
+    doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(214,230,240);doc.text(fit(sub,W-tx-220),tx,44);
+    doc.setFontSize(8);doc.text(BRAND.org,W-L,26,{align:"right"});doc.text("Gerado em "+new Date().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}),W-L,38,{align:"right"});
+    y=74;
   };
-  drawBox(40,"Conciliação",s.yes,s.total,st.meta,"lançamentos conciliados",s.vp);
-  drawBox(40+bw+16,"Identificação de receita",r.yes,hasRecCol()?r.total:0,st.metaR,"receitas identificadas",r.ve);
-  y+=132;
-  const rsF=filtered("fundo");
+  const sect=(t,x=L)=>{doc.setFont("helvetica","bold");doc.setFontSize(10.5);doc.setTextColor(...acc);doc.text(t,x,y);y+=6};
+  const fdesc=[st.f.de||st.f.ate?`${st.f.de?st.f.de.split("-").reverse().join("/"):"início"} a ${st.f.ate?st.f.ate.split("-").reverse().join("/"):"hoje"}`:"",st.f.tipo?"tipo "+st.f.tipo:"",st.f.analista?"analista "+st.f.analista:""].filter(Boolean).join(" · ");
+  const sub=`${st.isSample?"DADOS DE EXEMPLO · ":""}${scopeLabel().replace(" · com filtros","")}${fdesc?" · "+fdesc:""}`;
+
+  /* ===== Página 1: quadros, fundos, contas, atenção ===== */
+  top(sub);
+  const bw=(CW-16)/2, bh=96;
+  const drawBox=(x,title,yes,total,meta,unit,pendVal)=>{
+    const pct=total?yes/total:0, ok=pct>=meta/100, g=needFor(yes,total,meta), pend=total-yes, col=!total?mut:ok?okc:badc;
+    doc.setFillColor(...(!total?[246,248,250]:ok?[226,242,232]:[251,231,228]));doc.setDrawColor(...col);doc.setLineWidth(1);doc.roundedRect(x,y,bw,bh,6,6,"FD");
+    doc.setFont("helvetica","bold");doc.setFontSize(10.5);doc.setTextColor(...ink);doc.text(title,x+14,y+19);
+    if(!total){doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...mut);doc.text("Sem dados com os filtros atuais.",x+14,y+44);return}
+    doc.setFontSize(9);doc.setTextColor(...col);doc.text(ok?"Dentro da meta":`Abaixo da meta de ${meta}%`,x+bw-14,y+19,{align:"right"});
+    doc.setFontSize(30);doc.text(fmtPct(pct),x+14,y+56);
+    const rx=x+150, rw=bw-164;
+    doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...ink);
+    doc.text(fit(`${fmtInt(yes)} de ${fmtInt(total)} ${unit}`,rw),rx,y+40);
+    doc.setFont("helvetica","bold");doc.setTextColor(...(pend?badc:okc));doc.text(pend?`Faltam ${fmtPct(1-pct)} para 100%`:"100% concluído",rx,y+53);
+    // barra
+    doc.setFillColor(255,255,255);doc.roundedRect(x+14,y+64,bw-28,5,2.5,2.5,"F");doc.setFillColor(...col);doc.roundedRect(x+14,y+64,Math.max(5,(bw-28)*pct),5,2.5,2.5,"F");
+    doc.setDrawColor(...ink);doc.setLineWidth(.8);const mx=x+14+(bw-28)*meta/100;doc.line(mx,y+61,mx,y+72);
+    doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...ink);
+    const c1=ok?`Meta ${meta}%: folga de ${fmtInt(g.folga)}`:`Meta ${meta}%: faltam ${fmtInt(g.need)}`;
+    const c2=pend?`Para 100%: faltam ${fmtInt(pend)}${pendVal?" · "+fmtBRLc(pendVal):""}`:"Para 100%: nada pendente";
+    doc.setTextColor(...(ok?ink:badc));doc.text(c1,x+14,y+86);doc.setTextColor(...ink);doc.text(fit(c2,bw-28-doc.getTextWidth(c1)-16),x+bw-14,y+86,{align:"right"});
+  };
+  drawBox(L,"Conciliação",s.yes,s.total,st.meta,"lançamentos conciliados",s.vp);
+  drawBox(L+bw+16,"Identificação de receita",r.yes,hasRecCol()?r.total:0,st.metaR,"receitas identificadas",r.ve);
+  y+=bh+22;
+  // fundos (esq.) e atenção (dir.)
+  const rsF=filtered("fundo"); const yF=y;
   sect("Por fundo");
-  doc.autoTable({startY:y,head:[["Fundo","Contas","Lançamentos","Conciliação","Conc.: meta / 100%","Receitas","Receita identificada","Receita: meta / 100%"]],
-    body:FUNDOS.map(F=>{const sub=rsF.filter(x=>x.file.fundo===F.k);const a=stats(sub),b=recStats(sub);const n=contaList(F.k).length;const gc=needFor(a.yes,a.total,st.meta),gr=needFor(b.yes,b.total,st.metaR);
-      return [F.n,String(n),a.total?fmtInt(a.total):"–",a.total?fmtPct(a.pct):"–",a.total?`${gc.need?"faltam "+fmtInt(gc.need):"folga "+fmtInt(gc.folga)} / ${fmtInt(a.pend)}`:"–",b.total?fmtInt(b.total):"–",b.total?fmtPct(b.pct):"–",b.total?`${gr.need?"faltam "+fmtInt(gr.need):"folga "+fmtInt(gr.folga)} / ${fmtInt(b.pend)}`:"–"]}),
-    theme:"grid",headStyles:head,styles:{fontSize:9},columnStyles:{1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"},7:{halign:"right"}},margin:{left:40,right:40},didParseCell:both});
-  y=doc.lastAutoTable.finalY+22;
-  const ins=lastIns.map(t=>t.replace(/\s*Clique (para|e)[^.]*\.\s*/g," ").replace(/\s*·\s*$/,"").trim());
-  if(ins.length){sect("Pontos de atenção");doc.setFont("helvetica","normal");doc.setFontSize(9.5);doc.setTextColor(...ink);ins.forEach(t=>{const lines=doc.splitTextToSize("• "+t,W-90);if(y+lines.length*12>H-40){doc.addPage();y=44}doc.text(lines,46,y+6);y+=lines.length*12+2});y+=14}
+  doc.autoTable({startY:y,head:[["Fundo","Conciliação","Meta / 100%","Receita ident.","Meta / 100%"]],
+    body:FUNDOS.map(F=>{const sub=rsF.filter(x=>x.file.fundo===F.k);const a=stats(sub),b=recStats(sub);const gc=needFor(a.yes,a.total,st.meta),gr=needFor(b.yes,b.total,st.metaR);
+      return [F.n,a.total?fmtPct(a.pct):"–",a.total?`${gc.need?"faltam "+fmtInt(gc.need):"folga "+fmtInt(gc.folga)} / ${fmtInt(a.pend)}`:"–",b.total?fmtPct(b.pct):"–",b.total?`${gr.need?"faltam "+fmtInt(gr.need):"folga "+fmtInt(gr.folga)} / ${fmtInt(b.pend)}`:"–"]}),
+    theme:"grid",headStyles:head,styles:body,alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{0:{fontStyle:"bold"},1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"}},margin:{left:L},tableWidth:bw,didParseCell:both});
+  const yAfterF=doc.lastAutoTable.finalY;
+  y=yF; const ax=L+bw+16; sect("Pontos de atenção",ax);
+  const ins=lastIns.map((t,i)=>[t.replace(/\s*Clique (para|e)[^.]*\.\s*/g," ").replace(/\s*·\s*$/,"").trim(),lastSev[i]]).slice(0,6);
+  const SEV={bad:badc,warn:[160,107,0],ok:okc,info:[47,134,181]};
+  y+=6; doc.setFont("helvetica","normal");doc.setFontSize(8.3);
+  ins.forEach(([t,sv])=>{const lines=doc.splitTextToSize(t,bw-14).slice(0,2);doc.setFillColor(...(SEV[sv]||SEV.info));doc.circle(ax+3,y-2.6,2.4,"F");doc.setTextColor(...ink);doc.text(lines,ax+11,y);y+=lines.length*10+5});
+  if(lastIns.length>6){doc.setTextColor(...mut);doc.text(`+ ${lastIns.length-6} pontos no painel`,ax+11,y);y+=10}
+  y=Math.max(yAfterF,y)+20;
+  // contas
+  const by=contaStats(filtered("conta"));
+  const cl=contaList(st.f.fundo).map(([k,u])=>{const sub=by.get(k)||[];return {u,a:stats(sub),b:recStats(sub)}}).filter(x=>x.a.total).sort((x,y2)=>x.a.pct-y2.a.pct);
+  const MAXC=Math.max(4,Math.floor((H-y-85)/18));
+  sect(cl.length>MAXC?`Contas · as ${MAXC} com menor conciliação (de ${cl.length})`:"Contas");
+  doc.autoTable({startY:y,head:[["Conta","Fundo","Posição até","Lançamentos","Pendentes","Valor pendente","Conciliação","Meta / 100%","Receita ident."]],
+    body:cl.slice(0,MAXC).map(({u,a,b})=>{const g=needFor(a.yes,a.total,st.meta);return [u.label,fundoS(u.fundo),a.last?a.last.toLocaleDateString("pt-BR"):"–",fmtInt(a.total),fmtInt(a.pend),fmtBRLc(a.vp),fmtPct(a.pct),`${g.need?"faltam "+fmtInt(g.need):"folga "+fmtInt(g.folga)} / ${fmtInt(a.pend)}`,b.total?fmtPct(b.pct):"–"]}),
+    theme:"grid",headStyles:head,styles:body,alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{0:{fontStyle:"bold"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"},7:{halign:"right"},8:{halign:"right"}},margin:{left:L,right:L},didParseCell:both});
+
+  /* ===== Página 2: receita, tipo, idade, principais pendências ===== */
+  doc.addPage(); top(sub);
+  const y2=y; const half=(CW-16)/2;
   if(recGroups.length){
-    const rr=r.rr,I=r.yes;
     sect(`Identificação de receita por ${recLabel().toLowerCase()}`);
-    doc.autoTable({startY:y,head:[[recLabel(),"Receitas","Valor","Com identificação","Vazias","% com","% vazias"]],body:[...recGroups.map(o=>[o.label.length>70?o.label.slice(0,67)+"…":o.label,fmtInt(o.t),fmtBRL(o.v),fmtInt(o.id),fmtInt(o.t-o.id),fmtPct(o.id/o.t),fmtPct((o.t-o.id)/o.t)]),["Total",fmtInt(rr.length),fmtBRL(r.vt),fmtInt(I),fmtInt(rr.length-I),fmtPct(rr.length?I/rr.length:0),fmtPct(rr.length?(rr.length-I)/rr.length:0)]],theme:"grid",headStyles:head,styles:{fontSize:8.5},columnStyles:{1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"}},margin:{left:40,right:40},didParseCell:d=>{if(d.section==="body"&&d.row.index===d.table.body.length-1)d.cell.styles.fontStyle="bold"}});
-    y=doc.lastAutoTable.finalY+22;
+    const rg=recGroups.slice(0,8);
+    doc.autoTable({startY:y,head:[[recLabel(),"Receitas","Vazias","% com"]],
+      body:[...rg.map(o=>[o.label,fmtInt(o.t),fmtInt(o.t-o.id),fmtPct(o.id/o.t)]),["Total",fmtInt(r.total),fmtInt(r.pend),fmtPct(r.pct)]],
+      theme:"grid",headStyles:head,styles:{...body,overflow:"ellipsize"},alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{0:{cellWidth:half-150},1:{halign:"right"},2:{halign:"right"},3:{halign:"right"}},margin:{left:L},tableWidth:half,
+      didParseCell:d=>{both(d);if(d.section==="body"&&d.row.index===d.table.body.length-1){d.cell.styles.fontStyle="bold";d.cell.styles.fillColor=[225,236,243]}}});
   }
-  const months=new Map(); rs.forEach(x=>{if(!x.d)return;const k=mkey(x.d);const o=months.get(k)||{t:0,y:0};o.t++;if(x.k==="yes")o.y++;months.set(k,o)});
-  const ms=[...months.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-  if(ms.length){
-    sect("Conciliação por mês",190);
-    const cx=60,cw=W-120,ch=120,cy=y+12; const lo=Math.max(0,Math.min(st.meta-10,...ms.map(([,o])=>Math.floor(o.y/o.t*100/10)*10)));
-    const yv=v=>cy+ch-(v-lo)/(100-lo)*ch;
-    doc.setDrawColor(216,223,219);doc.setLineWidth(.5);
-    [lo,(lo+100)/2,100].forEach(v=>{doc.line(cx,yv(v),cx+cw,yv(v));doc.setFontSize(7.5);doc.setTextColor(...mut);doc.text(Math.round(v)+"%",cx-6,yv(v)+3,{align:"right"})});
-    const bw2=Math.min(36,cw/ms.length*.6);
-    ms.forEach(([k,o],i)=>{const p=o.y/o.t*100;const x=cx+(i+.5)*cw/ms.length;doc.setFillColor(...(p>=st.meta?okc:badc));doc.rect(x-bw2/2,yv(p),bw2,cy+ch-yv(p),"F");doc.setFontSize(7.5);doc.setTextColor(...ink);doc.text(p.toLocaleString("pt-BR",{maximumFractionDigits:1})+"%",x,yv(p)-3,{align:"center"});doc.setTextColor(...mut);doc.text(mlabel(k),x,cy+ch+11,{align:"center"})});
-    doc.setDrawColor(...ink);doc.setLineDashPattern([4,3],0);doc.line(cx,yv(st.meta),cx+cw,yv(st.meta));doc.setLineDashPattern([],0);
-    doc.setFontSize(7.5);doc.setTextColor(...ink);doc.text("meta "+st.meta+"%",cx+cw+4,yv(st.meta)+3);
-    y=cy+ch+30;
-  }
-  const by=contaStats(filtered("conta")), cl=contaList(st.f.fundo);
-  if(cl.length>1){
-    sect("Por conta");
-    doc.autoTable({startY:y,head:[["Conta","Fundo","Posição até","Lançamentos","Pendentes","Valor pendente","Conciliação","Para a meta","Para 100%","Receita identificada"]],
-      body:cl.map(([k,u])=>{const sub=by.get(k)||[];const a=stats(sub),b=recStats(sub);const g=needFor(a.yes,a.total,st.meta);return [u.label,fundoS(u.fundo),a.last?a.last.toLocaleDateString("pt-BR"):"–",fmtInt(a.total),fmtInt(a.pend),fmtBRL(a.vp),a.total?fmtPct(a.pct):"–",a.total?(g.need?"faltam "+fmtInt(g.need):"folga "+fmtInt(g.folga)):"–",a.pend?"faltam "+fmtInt(a.pend):"ok",b.total?fmtPct(b.pct):"–"]}),
-      theme:"grid",headStyles:head,styles:{fontSize:8.5},columnStyles:{3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"},7:{halign:"right"},8:{halign:"right"},9:{halign:"right"}},margin:{left:40,right:40},didParseCell:both});
-    y=doc.lastAutoTable.finalY+22;
-  }
-  if(extraRows.length){
-    sect("Outras abas com conciliação");
-    doc.autoTable({startY:y,head:[["Aba","Planilha","Fundo","Lançamentos","Pendentes","Conciliação","Falta p/ 100%"]],body:extraRows.map(e=>[e.x.name,e.f.label,fundoS(e.f.fundo),fmtInt(e.s.total),fmtInt(e.s.pend),fmtPct(e.s.pct),fmtPct(1-e.s.pct)]),theme:"grid",headStyles:head,styles:{fontSize:9},columnStyles:{3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"}},margin:{left:40,right:40},didParseCell:both});
-    y=doc.lastAutoTable.finalY+22;
-  }
+  const yA=recGroups.length?doc.lastAutoTable.finalY:y;
+  y=y2; const rx2=L+half+16;
   const tm=new Map();rs.forEach(x=>{const o=tm.get(x.tipo)||{t:0,y:0};o.t++;if(x.k==="yes")o.y++;tm.set(x.tipo,o)});
-  sect("Por tipo de lançamento");
-  doc.autoTable({startY:y,head:[["Tipo","Lançamentos","Conciliados","Pendentes","Conciliação","Falta p/ 100%"]],body:[...tm.entries()].sort((a,b)=>b[1].t-a[1].t).map(([k,o])=>[k,fmtInt(o.t),fmtInt(o.y),fmtInt(o.t-o.y),fmtPct(o.y/o.t),fmtPct((o.t-o.y)/o.t)]),theme:"grid",headStyles:head,styles:{fontSize:9},columnStyles:{1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"}},tableWidth:540,margin:{left:40},didParseCell:both});
-  y=doc.lastAutoTable.finalY+22;
+  sect("Por tipo de lançamento",rx2);
+  doc.autoTable({startY:y,head:[["Tipo","Lançamentos","Pendentes","Conciliação","Falta p/ 100%"]],body:[...tm.entries()].sort((a,b)=>b[1].t-a[1].t).slice(0,6).map(([k,o])=>[k,fmtInt(o.t),fmtInt(o.t-o.y),fmtPct(o.y/o.t),fmtPct((o.t-o.y)/o.t)]),
+    theme:"grid",headStyles:head,styles:body,alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{0:{fontStyle:"bold"},1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"}},margin:{left:rx2},tableWidth:half,didParseCell:both});
   const p=rs.filter(x=>x.k!=="yes"); const b=AGES.map(()=>({n:0,v:0}));
   p.forEach(x=>{const i=x.dias==null?3:AGES.findIndex(a=>x.dias<=a.max);b[i].n++;if(x.val!=null)b[i].v+=Math.abs(x.val)});
-  sect("Idade das pendências");
-  doc.autoTable({startY:y,head:[["Faixa","Pendências","Valor"]],body:AGES.map((a,i)=>[a.k,fmtInt(b[i].n),fmtBRL(b[i].v)]),theme:"grid",headStyles:head,styles:{fontSize:9},columnStyles:{1:{halign:"right"},2:{halign:"right"}},tableWidth:320,margin:{left:40}});
-  y=doc.lastAutoTable.finalY+22;
-  const plst=pendList(); const multi=new Set(rs.map(x=>x.key)).size>1;
-  sect(`Pendências de conciliação (${fmtInt(plst.length)})`);
-  doc.autoTable({startY:y,head:[[...(multi?["Conta"]:[]),"Situação","Data","Dias","Tipo","Documento","Histórico","Valor","Analista","Obs. do analista"]],
-    body:plst.map(x=>[...(multi?[x.cl]:[]),x.situ,x.d?x.d.toLocaleDateString("pt-BR"):"–",x.dias??"–",x.tipo,x.doc,x.hist,x.val!=null?fmtBRL(x.val):"–",x.analista,(x.obsA||"").slice(0,160)]),
-    theme:"striped",headStyles:head,styles:{fontSize:7.5,cellPadding:3,overflow:"linebreak"},margin:{left:40,right:40}});
+  y=doc.lastAutoTable.finalY+16; sect("Idade das pendências",rx2);
+  doc.autoTable({startY:y,head:[["Faixa","Pendências","Valor"]],body:AGES.map((a,i)=>[a.k,fmtInt(b[i].n),fmtBRLc(b[i].v)]),theme:"grid",headStyles:head,styles:body,alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{1:{halign:"right"},2:{halign:"right"}},margin:{left:rx2},tableWidth:half,
+    didParseCell:d=>{if(d.section==="body"&&d.row.index>=2&&d.column.index===1&&b[d.row.index].n){d.cell.styles.textColor=badc;d.cell.styles.fontStyle="bold"}}});
+  y=Math.max(yA,doc.lastAutoTable.finalY)+20;
+  if(extraRows.length){
+    doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...mut);
+    doc.text("Outras abas (fora dos quadros): "+extraRows.map(e=>`${e.x.name} ${fmtPct(e.s.pct)} conciliado, ${fmtInt(e.s.pend)} pendentes`).join(" · "),L,y);y+=16;
+  }
+  // principais pendências: maiores valores
+  const plst=pendList(); const top15=[...plst].sort((a,b2)=>Math.abs(b2.val||0)-Math.abs(a.val||0)).slice(0,Math.max(5,Math.min(15,Math.floor((H-y-95)/18))));
+  sect(`Principais pendências · ${top15.length} maiores valores de ${fmtInt(plst.length)}`);
+  doc.autoTable({startY:y,head:[["Conta","Data","Dias","Tipo","Documento","Histórico","Valor"]],
+    body:top15.map(x=>[x.cl,x.d?x.d.toLocaleDateString("pt-BR"):"–",x.dias??"–",x.tipo,x.doc,x.hist,x.val!=null?fmtBRL(x.val):"–"]),
+    theme:"grid",headStyles:head,styles:{...body,overflow:"ellipsize"},alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{0:{cellWidth:80,fontStyle:"bold"},1:{cellWidth:56},2:{cellWidth:34,halign:"right"},3:{cellWidth:62},4:{cellWidth:86},6:{cellWidth:100,halign:"right"}},margin:{left:L,right:L},
+    didParseCell:d=>{if(d.section==="body"&&d.column.index===2&&+d.cell.raw>90){d.cell.styles.textColor=badc;d.cell.styles.fontStyle="bold"}}});
+  y=doc.lastAutoTable.finalY+12;
+  if(plst.length>top15.length){doc.setFont("helvetica","italic");doc.setFontSize(8);doc.setTextColor(...mut);doc.text(`A lista completa das ${fmtInt(plst.length)} pendências está no Excel (botão Excel do painel).`,L,y)}
   const n=doc.internal.getNumberOfPages();
-  for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(140);doc.text(`Metas – Tesouraria · ${BRAND.org} · criado por ${BRAND.autor} · página ${i} de ${n}`,W-40,H-20,{align:"right"})}
+  for(let i=1;i<=n;i++){doc.setPage(i);doc.setDrawColor(...line);doc.setLineWidth(.5);doc.line(L,H-30,W-L,H-30);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(...mut);doc.text(`Metas – Tesouraria · ${BRAND.org}`,L,H-18);doc.text(`Criado por ${BRAND.autor} · página ${i} de ${n}`,W-L,H-18,{align:"right"})}
   await save(`metas-tesouraria-${stamp()}.pdf`,doc.output("blob"));
 }
 
