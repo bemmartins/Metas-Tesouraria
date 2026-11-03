@@ -120,8 +120,10 @@ select{max-width:220px}
 .box.ok .meter i{background:var(--ok)} .box.bad .meter i{background:var(--bad)}
 .meter b{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--fg)}
 .meter span{position:absolute;top:14px;transform:translateX(-50%);font:600 .7rem var(--font-data);color:var(--muted);white-space:nowrap}
+.kpis.k4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 12px;min-width:0}
+.kpi .g100s{margin-top:2px}
 .kpi small{display:block;color:var(--muted);font-size:.64rem;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
 .kpi div{font:600 1.05rem var(--font-data);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .kpi.bad div{color:var(--bad)} .kpi.warn div{color:var(--warn)} .kpi.good div{color:var(--ok)}
@@ -274,6 +276,16 @@ tr.total td{font-weight:700;background:var(--surface-2)}
       <div class="box ok" id="boxRec"></div>
     </div>
 
+    <section class="card" id="secProj">
+      <div class="row">
+        <h2>Projeção da meta</h2>
+        <div class="seg" id="segProj" role="group" aria-label="Indicador"><button type="button" data-pm="conc" aria-pressed="true">Conciliação</button><button type="button" data-pm="rec" aria-pressed="false">Identificação de receita</button></div>
+      </div>
+      <div class="kpis k4" id="projSum"></div>
+      <div id="projWrap"><div class="cbox" style="height:300px"><canvas id="cProj" aria-label="Gráfico de projeção da meta"></canvas></div></div>
+      <p class="note">Linha azul: percentual acumulado até cada mês. Linha tracejada: projeção até o fim do período, mantendo o ritmo e o volume médios dos últimos 3 meses.</p>
+    </section>
+
     <section class="card">
       <div class="row"><h2>Por fundo</h2><span class="note">Clique num fundo para filtrar o painel</span></div>
       <div class="fgrid" id="fundos"></div>
@@ -402,7 +414,7 @@ const fundoS=k=>(FUNDOS.find(f=>f.k===k)||{s:"—"}).s;
 const fOrd=k=>{const i=FUNDOS.findIndex(f=>f.k===k);return i<0?9:i};
 const today0=(()=>{const d=new Date();d.setHours(0,0,0,0);return d})();
 
-const st={files:[],isSample:true,meta:85,metaR:85,f:{fundo:"",conta:"",de:"",ate:"",tipo:"",analista:""},sort:{k:"dias",dir:-1},insAll:false,view:"visao",use:new Map()};
+const st={projM:"conc",files:[],isSample:true,meta:85,metaR:85,f:{fundo:"",conta:"",de:"",ate:"",tipo:"",analista:""},sort:{k:"dias",dir:-1},insAll:false,view:"visao",use:new Map()};
 let downloads=null, charts={}, view=null, lastSev=[], lastIns=[], recGroups=[], listShown=[], pendShown=[], pendingFundo=null, lastFocus=null;
 
 /* ---------- células ---------- */
@@ -748,6 +760,7 @@ function render(){
   renderBoxes(rs,s); renderFundos(); renderInsights(rs,s); renderRec(rs);
   renderContas(); renderAnalistas(rs); renderTipoTable(rs); renderExtras(); renderPend(); renderPlan();
   if(st.view==="analise") renderCharts(rs);
+  if(st.view==="visao") renderProj(rs);
 }
 
 function renderInsights(rs,s){
@@ -854,6 +867,64 @@ function renderCharts(rs){
   const ts=[...tp.entries()].sort((a,b)=>(b[1].y+b[1].p)-(a[1].y+a[1].p)).slice(0,8);
   mkChart("cTipo",{type:"bar",plugins:[tipoLabels(ts,c)],data:{labels:ts.map(([t])=>t),datasets:[{label:"Conciliados",data:ts.map(([,o])=>o.y),backgroundColor:c.ok,borderRadius:3},{label:"Pendentes",data:ts.map(([,o])=>o.p),backgroundColor:c.bad,borderRadius:3}]},
     options:{indexAxis:"y",maintainAspectRatio:false,layout:{padding:{right:92}},plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10,usePointStyle:true}},tooltip:{...tooltip,callbacks:{afterBody:it=>{const o=ts[it[0].dataIndex][1];return ["Conciliação: "+fmtPct(o.y/(o.y+o.p)),"Falta para 100%: "+fmtPct(o.p/(o.y+o.p))+" ("+fmtInt(o.p)+")"]}}}},scales:{x:{stacked:true,beginAtZero:true,grid:{color:c.ln}},y:{stacked:true,grid:{display:false}}}}});
+}
+/* ---------- projeção da meta ---------- */
+function projData(rs,metric){
+  const isR=metric==="rec", meta=isR?st.metaR:st.meta;
+  const U=isR?rs.filter(r=>r.isRec):rs;
+  const m=new Map(); U.forEach(r=>{if(!r.d)return;const k=mkey(r.d);const o=m.get(k)||{t:0,y:0};o.t++;if(isR?r.hasId:r.k==="yes")o.y++;m.set(k,o)});
+  const ks=[...m.keys()].sort(); if(ks.length<2) return null;
+  // preenche meses sem lançamento
+  const months=[]; let [yy,mm]=ks[0].split("-").map(Number); const [ly,lm]=ks[ks.length-1].split("-").map(Number);
+  while(yy<ly||(yy===ly&&mm<=lm)){months.push(`${yy}-${String(mm).padStart(2,"0")}`);mm++;if(mm>12){mm=1;yy++}}
+  let cy=0,ct=0; const real=months.map(k=>{const o=m.get(k)||{t:0,y:0};cy+=o.y;ct+=o.t;return {k,t:o.t,y:o.y,cum:ct?cy/ct:null}});
+  const last3=real.slice(-3).filter(x=>x.t); const vol=last3.reduce((a,x)=>a+x.t,0)/Math.max(1,last3.length);
+  const pace=last3.reduce((a,x)=>a+x.y,0)/Math.max(1,last3.reduce((a,x)=>a+x.t,0));
+  // horizonte: até dezembro do último ano (mínimo 2 meses à frente)
+  let n=12-lm; if(n<2) n+=12; n=Math.min(n,12);
+  const fut=[]; let fy=cy,ft=ct,py=ly,pm=lm;
+  for(let i=0;i<n;i++){pm++;if(pm>12){pm=1;py++};fy+=vol*pace;ft+=vol;fut.push({k:`${py}-${String(pm).padStart(2,"0")}`,cum:fy/ft})}
+  const V=vol*n; const reqPace=V?(meta/100*(ct+V)-cy)/V:Infinity;
+  const endK=fut[fut.length-1].k;
+  return {meta,real,fut,pace,vol,reqPace,now:cy/ct,end:fut[fut.length-1].cum,endK,cy,ct,pend:ct-cy,isR,n};
+}
+function renderProj(rs){
+  const sec=$("secProj"); if(!sec) return;
+  const metric=st.projM||"conc";
+  document.querySelectorAll("#segProj button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.pm===metric)));
+  const recBtn=document.querySelector('#segProj [data-pm="rec"]'); if(recBtn) recBtn.hidden=!hasRecCol();
+  const P=projData(rs,metric), box=$("projSum");
+  if(!P){box.innerHTML=`<p class="empty" style="padding:0">São necessários lançamentos de pelo menos dois meses para projetar.</p>`;if(charts.cProj){charts.cProj.destroy();delete charts.cProj}$("projWrap").hidden=true;return}
+  $("projWrap").hidden=false;
+  const okEnd=P.end>=P.meta/100, okNow=P.now>=P.meta/100, unit=P.isR?"receitas":"lançamentos";
+  let need;
+  if(P.reqPace<=P.pace) need={t:"O ritmo atual basta",d:`Para fechar ${mlabel(P.endK)} na meta, cada mês precisa de ${fmtPct(Math.max(0,P.reqPace))}; o ritmo atual é ${fmtPct(P.pace)}.`,c:"good"};
+  else if(P.reqPace<=1) need={t:`Precisa subir para ${fmtPct(P.reqPace)} ao mês`,d:`Hoje o ritmo é ${fmtPct(P.pace)} ao mês. A diferença é de ${fmtPP(P.reqPace-P.pace)} p.p.`,c:"bad"};
+  else {const gap=Math.ceil(P.meta/100*(P.ct+P.vol*P.n)-P.cy-P.vol*P.n);need={t:`Precisa resolver ${fmtInt(gap)} pendentes antigos`,d:`Mesmo com 100% nos próximos meses, só bate a meta resolvendo ${unit} já em aberto.`,c:"bad"}}
+  box.innerHTML=`<div class="kpi ${okNow?"good":"bad"}"><small>Hoje</small><div>${fmtPct(P.now)}</div><span class="g100s">${fmtInt(P.cy)} de ${fmtInt(P.ct)} ${unit}</span></div>
+    <div class="kpi ${okEnd?"good":"bad"}"><small>Projeção para ${mlabel(P.endK)}</small><div>${fmtPct(P.end)}</div><span class="g100s">${okEnd?"dentro":"abaixo"} da meta de ${P.meta}%</span></div>
+    <div class="kpi"><small>Ritmo dos últimos 3 meses</small><div>${fmtPct(P.pace)}</div><span class="g100s">~${fmtInt(Math.round(P.vol))} ${unit} por mês</span></div>
+    <div class="kpi ${need.c}"><small>Para fechar o período na meta</small><div style="font-size:.95rem;font-family:var(--font-body)">${need.t}</div><span class="g100s">${need.d}</span></div>`;
+  if(!window.Chart) return;
+  const c=chartBase();
+  const labels=[...P.real.map(x=>mlabel(x.k)),...P.fut.map(x=>mlabel(x.k))];
+  const nR=P.real.length, nF=P.fut.length;
+  const realD=[...P.real.map(x=>x.cum!=null?+(x.cum*100).toFixed(2):null),...Array(nF).fill(null)];
+  const projD=[...Array(nR-1).fill(null),+(P.real[nR-1].cum*100).toFixed(2),...P.fut.map(x=>+(x.cum*100).toFixed(2))];
+  const monthD=[...P.real.map(x=>x.t?+(x.y/x.t*100).toFixed(1):null),...Array(nF).fill(null)];
+  const all=[...realD,...projD,...monthD].filter(v=>v!=null);
+  const lo=Math.max(0,Math.floor((Math.min(P.meta,...all)-5)/5)*5);
+  const tone=okEnd?c.ok:c.bad;
+  mkChart("cProj",{data:{labels,datasets:[
+    {type:"line",label:"Acumulado realizado",data:realD,borderColor:c.acc,backgroundColor:c.acc,borderWidth:2.6,tension:.25,pointRadius:3,pointBackgroundColor:c.acc,order:1},
+    {type:"line",label:"Projeção",data:projD,borderColor:tone,backgroundColor:tone,borderDash:[6,5],borderWidth:2.4,tension:.25,pointRadius:(ctx)=>ctx.dataIndex===labels.length-1?5:0,pointBackgroundColor:tone,order:0},
+    {type:"line",label:`Meta ${P.meta}%`,data:labels.map(()=>P.meta),borderColor:c.fg,borderDash:[3,3],borderWidth:1.2,pointRadius:0,order:2},
+    {type:"bar",label:"% do mês",data:monthD,backgroundColor:c.soft,borderColor:c.ln,borderWidth:1,borderRadius:3,order:3,barPercentage:.6}]},
+    options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+      plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10,usePointStyle:true}},
+        tooltip:{backgroundColor:c.surf,titleColor:c.fg,bodyColor:c.fg,borderColor:c.ln,borderWidth:1,padding:10,filter:x=>x.raw!=null,
+          callbacks:{label:x=>`${x.dataset.label}: ${x.raw.toLocaleString("pt-BR",{maximumFractionDigits:1})}%`,afterBody:it=>{const i=it[0].dataIndex;return i>=nR?["Projeção pelo ritmo dos últimos 3 meses"]:[`Falta para 100%: ${fmtPct(1-P.real[i].cum)}`]}}}},
+      scales:{y:{min:lo,max:100,ticks:{callback:v=>v+"%"},grid:{color:c.ln}},x:{grid:{display:false}}}}});
 }
 function pctBar(p,meta){const col=p>=(meta??st.meta)/100?"var(--ok)":"var(--bad)";return `<div class="bar"><span><i style="width:${p*100}%;background:${col}"></i></span><b style="color:${col}">${fmtPct(p)}</b></div>`}
 function renderContas(){
@@ -1353,6 +1424,7 @@ function showView(v){
   $("filters").hidden=v==="planilhas";
   $("sampleBanner").hidden=!st.isSample||v==="planilhas";
   if(v==="analise"&&view) renderCharts(view.rs);
+  if(v==="visao"&&view) renderProj(view.rs);
   if(v==="pendencias") renderPend();
   window.scrollTo({top:0});
 }
@@ -1361,6 +1433,7 @@ window.addEventListener("hashchange",()=>showView(location.hash.slice(1)));
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
+  const pmb=t.closest("[data-pm]"); if(pmb){st.projM=pmb.dataset.pm;renderProj(view.rs);return}
   const fz=t.closest("[data-fz]"); if(fz){st.f.fundo=fz.dataset.fz;st.f.conta="";syncInputs();render();return}
   const fc=t.closest(".fcard[data-fk]"); if(fc){const k=fc.dataset.fk;st.f.fundo=st.f.fundo===k?"":k;st.f.conta="";syncInputs();render();return}
   const gv=t.closest("[data-go]"); if(gv){go(gv.dataset.go);return}
@@ -1400,7 +1473,7 @@ $("fSitu").addEventListener("change",renderPend); $("busca").addEventListener("i
 $("btnRemoverTudo").addEventListener("click",()=>{st.files=sampleFiles();st.isSample=true;st.f.conta="";refreshFilterOptions();render();persist();showMsg("Planilhas removidas deste navegador.")});
 $("btnPdf").addEventListener("click",async()=>{$("btnPdf").disabled=true;try{await exportPdf()}catch(err){showMsg("Não consegui gerar o PDF: "+err.message,true)}finally{$("btnPdf").disabled=false}});
 $("btnXlsx").addEventListener("click",async()=>{$("btnXlsx").disabled=true;try{if(window.ExcelJS){try{await exportXlsxPro()}catch(e1){console.error(e1);await exportXlsx()}}else await exportXlsx()}catch(err){showMsg("Não consegui gerar o Excel: "+err.message,true)}finally{$("btnXlsx").disabled=false}});
-const rerenderCharts=()=>{if(view&&st.view==="analise")renderCharts(view.rs)};
+const rerenderCharts=()=>{if(!view)return;if(st.view==="analise")renderCharts(view.rs);if(st.view==="visao")renderProj(view.rs)};
 try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",rerenderCharts)}catch(_){}
 new MutationObserver(rerenderCharts).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 
