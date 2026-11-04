@@ -306,7 +306,7 @@ tr.total td{font-weight:700;background:var(--surface-2)}
       <div class="row">
         <h2>Identificação de receita · detalhe</h2>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <label for="recGrp" style="display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)">Agrupar por <select id="recGrp"><option value="item">Item patrimonial</option><option value="fundo">Fundo</option><option value="mes">Mês</option><option value="conta">Conta</option></select></label>
+          <label for="recGrp" style="display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)">Agrupar por <select id="recGrp"><option value="nat">Natureza</option><option value="item">Item patrimonial</option><option value="fundo">Fundo</option><option value="mes">Mês</option><option value="conta">Conta</option></select></label>
           <button type="button" id="recAll" class="more">Ver receitas vazias</button>
         </div>
       </div>
@@ -828,7 +828,7 @@ function renderInsights(rs,s){
 }
 
 /* ---------- receita detalhe ---------- */
-const recLabel=()=>({item:"Item patrimonial",fundo:"Fundo",conta:"Conta",mes:"Mês"})[$("recGrp").value]||"Grupo";
+const recLabel=()=>({nat:"Natureza",item:"Item patrimonial",fundo:"Fundo",conta:"Conta",mes:"Mês"})[$("recGrp").value]||"Grupo";
 function renderRec(rs){
   const sec=$("secRec"), has=hasRecCol(), rr=rs.filter(r=>r.isRec);
   sec.hidden=!has; recGroups=[]; if(!has) return;
@@ -838,6 +838,7 @@ function renderRec(rs){
     if(by==="mes"){k=r.d?mkey(r.d):"~";l=r.d?mlabel(k):"(sem data)"}
     else if(by==="conta"){k=r.key;l=r.cl+(r.file.fundo?" · "+fundoS(r.file.fundo):"")}
     else if(by==="fundo"){k=r.file.fundo||"~";l=r.file.fundo?fundoNome(r.file.fundo):"Sem fundo"}
+    else if(by==="nat"){const n=natKey(r);k=n.k;l=n.l}
     else{const it=r.item&&r.item!=="-"?r.item:"";const m=it.match(/^(\d+)\s*-/);k=m?m[1]:norm(it)||"~";l=it||"(sem item patrimonial)"}
     const o=g.get(k)||{k,labels:new Map(),t:0,id:0,v:0,vE:0,empty:[]};
     o.labels.set(l,(o.labels.get(l)||0)+1);o.t++;const v=r.val!=null?Math.abs(r.val):0;o.v+=v;
@@ -1112,8 +1113,8 @@ function openList(title,sub,list,third){
   lastFocus=document.activeElement; listShown=list;
   $("drawer").style.width="min(800px,100%)"; $("dConta").textContent=sub; $("dTitle").textContent=title;
   const multi=new Set(list.map(r=>r.key||r.cl)).size>1;
-  const th3=third==="hist"?"Lançamento":"Item patrimonial";
-  $("dBody").innerHTML=!list.length?`<p class="empty">Nada aqui.</p>`:`<div class="scroll" style="max-height:none"><table><thead><tr>${multi?"<th>Conta</th>":""}<th>Data</th><th>Documento</th><th>${th3}</th><th class="num">Valor</th><th>Conciliado</th><th class="num">Linha</th></tr></thead><tbody>${list.map((r,i)=>{const v3=third==="hist"?(r.ent||r.hist):r.item;return `<tr class="click" data-l="${i}" tabindex="0">${multi?`<td>${esc(r.cl)}</td>`:""}<td>${r.d?r.d.toLocaleDateString("pt-BR"):"–"}</td><td>${esc(r.doc)}</td><td class="long" title="${esc(v3)}">${esc(v3)}</td><td class="num">${r.val!=null?fmtBRL(r.val):"–"}</td><td><span class="chip ${r.k}">${esc(r.situ)}</span></td><td class="num">${r.line}</td></tr>`}).join("")}</tbody></table></div><p class="note">Clique numa linha para ver todos os campos. Linha é a linha na planilha original.</p>`;
+  const th3=third==="hist"?"Lançamento":"Natureza";
+  $("dBody").innerHTML=!list.length?`<p class="empty">Nada aqui.</p>`:`<div class="scroll" style="max-height:none"><table><thead><tr>${multi?"<th>Conta</th>":""}<th>Data</th><th>Documento</th><th>${th3}</th><th class="num">Valor</th><th>Conciliado</th><th class="num">Linha</th></tr></thead><tbody>${list.map((r,i)=>{const v3=third==="hist"?(r.ent||r.hist):(r.nat||r.item);return `<tr class="click" data-l="${i}" tabindex="0">${multi?`<td>${esc(r.cl)}</td>`:""}<td>${r.d?r.d.toLocaleDateString("pt-BR"):"–"}</td><td>${esc(r.doc)}</td><td class="long" title="${esc(v3)}">${esc(v3)}</td><td class="num">${r.val!=null?fmtBRL(r.val):"–"}</td><td><span class="chip ${r.k}">${esc(r.situ)}</span></td><td class="num">${r.line}</td></tr>`}).join("")}</tbody></table></div><p class="note">Clique numa linha para ver todos os campos. Linha é a linha na planilha original.</p>`;
   $("scrim").hidden=$("drawer").hidden=false; $("dClose").focus();
 }
 function closeDrawer(){$("scrim").hidden=$("drawer").hidden=true;if(lastFocus&&lastFocus.focus)lastFocus.focus()}
@@ -1161,7 +1162,7 @@ async function exportXlsx(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(resumo.length?resumo:[{"Conta":"Nenhuma conta"}],opt),"Contas");
   const rows=p.map(r=>({"Conta":r.cl,"Fundo":fundoNome(r.file.fundo),"Planilha":r.file.label,"Linha na planilha":r.line,"Situação":r.situ,"Data":r.d||"","Dias em aberto":r.dias??"","Tipo":r.tipo,"Documento":r.doc,"Histórico":r.hist,"Entidade / Credor":r.ent,"Valor":r.val??"","Analista":r.analista,"Observação do analista":r.obsA}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{"Conta":"Nenhuma pendência"}],opt),"Pendências");
-  if(hasRecCol()){const semId=rs.filter(r=>r.isRec&&!r.hasId);XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(semId.length?semId.map(r=>({"Conta":r.cl,"Fundo":fundoNome(r.file.fundo),"Planilha":r.file.label,"Linha na planilha":r.line,"Data":r.d||"","Item patrimonial":r.item,"Documento":r.doc,"Lançamento":r.hist,"Valor":r.val??"","Conciliado":r.situ})):[{"Conta":"Todas as receitas têm identificação"}],opt),"Receitas sem identificação")}
+  if(hasRecCol()){const semId=rs.filter(r=>r.isRec&&!r.hasId);XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(semId.length?semId.map(r=>({"Conta":r.cl,"Fundo":fundoNome(r.file.fundo),"Planilha":r.file.label,"Linha na planilha":r.line,"Data":r.d||"","Natureza":r.nat||r.item,"Documento":r.doc,"Lançamento":r.hist,"Valor":r.val??"","Conciliado":r.situ})):[{"Conta":"Todas as receitas têm identificação"}],opt),"Receitas sem identificação")}
   extraRows.forEach(e=>{const pend=e.x.records.filter(r=>r.k!=="yes");if(!pend.length)return;const nm=("Pend. "+e.x.name).slice(0,31);if(wb.SheetNames.includes(nm))return;XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(pend.map(r=>({"Planilha":e.f.label,"Linha na planilha":r.line,"Data":r.d||"","Tipo":r.tipo,"Documento":r.doc,"Lançamento":r.hist,"Autor / Entidade":r.ent,"Valor":r.val??"","Conciliado":r.situ})),opt),nm)});
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array",cellDates:true});
   await save(`metas-tesouraria-${stamp()}.xlsx`,new Blob([out]));
@@ -1302,7 +1303,7 @@ async function exportXlsxPro(){
   const wb=new ExcelJS.Workbook(); wb.creator=BRAND.autor; wb.created=new Date(); wb.title="Metas – Tesouraria";
   const {rs,s}=view, R=recStats(rs), sc=scopeLabel(), now=new Date().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
   const logoId=BRAND.logo?(()=>{try{return wb.addImage({base64:BRAND.logo,extension:"jpeg"})}catch(_){return null}})():null;
-  const SHEETS={contas:"Contas",pend:"Pendências",rec:"Receita por item",vaz:"Receitas vazias"};
+  const SHEETS={contas:"Contas",pend:"Pendências",rec:"Receita por natureza",vaz:"Receitas vazias"};
 
   /* ===== Painel ===== */
   const ws=wb.addWorksheet("Painel",{properties:{tabColor:{argb:XC.blue}},views:[{showGridLines:false}]});
@@ -1392,7 +1393,7 @@ async function exportXlsxPro(){
   // navegação
   sect("Abas deste arquivo");
   const nav=[[SHEETS.contas,"Todas as contas, com totais"],[SHEETS.pend,`${fmtInt(s.pend)} lançamentos pendentes de conciliação`]];
-  if(hasRecCol()){nav.push([SHEETS.rec,"Identificação de receita por item patrimonial"]);nav.push([SHEETS.vaz,`${fmtInt(R.pend)} receitas sem identificação`])}
+  if(hasRecCol()){nav.push([SHEETS.rec,`Identificação de receita por ${recLabel().toLowerCase()}`]);nav.push([SHEETS.vaz,`${fmtInt(R.pend)} receitas sem identificação`])}
   extraRows.forEach(e=>{if(e.s.pend)nav.push([("Pend. "+e.x.name).slice(0,31),`Pendentes da aba ${e.x.name}`])});
   nav.forEach(([n,d])=>{const c=ws.getCell(row,2);xLink(c,n+" →",n,XC.blue);c.alignment={indent:1};ws.mergeCells(row,4,row,12);const t=ws.getCell(row,4);t.value=d;t.font=xfont(10,false,XC.muted);ws.getRow(row).height=18;row++});
   row++;
@@ -1453,8 +1454,8 @@ async function exportXlsxPro(){
       {tab:XC.ok,summary:`${fmtInt(R.total)} receitas · ${fmtPct(R.pct)} com identificação · faltam ${fmtInt(R.pend)} para 100%`,totals:[null,"sum","sum","sum","sum",null,null,"sum"]});
     const semId=rs.filter(x=>x.isRec&&!x.hasId);
     table(SHEETS.vaz,`Receitas sem identificação  ·  ${fmtInt(semId.length)}`,[
-      {h:"Conta",w:17,bold:true},{h:"Fundo",w:8},{h:"Data",w:12,fmt:"date"},{h:"Item patrimonial",w:42,wrap:true},{h:"Documento",w:16},{h:"Lançamento",w:30,wrap:true},{h:"Valor",w:18,fmt:"brl"},{h:"Conciliado",w:11,color:v=>v==="Sim"?XC.ok:XC.bad},{h:"Planilha",w:20},{h:"Linha",w:8,fmt:"int"}],
-      semId.map(x=>[x.cl,fundoS(x.file.fundo),x.d||null,x.item,x.doc,x.hist,x.val,x.situ,x.file.label,x.line]),
+      {h:"Conta",w:17,bold:true},{h:"Fundo",w:8},{h:"Data",w:12,fmt:"date"},{h:"Natureza",w:42,wrap:true},{h:"Documento",w:16},{h:"Lançamento",w:30,wrap:true},{h:"Valor",w:18,fmt:"brl"},{h:"Conciliado",w:11,color:v=>v==="Sim"?XC.ok:XC.bad},{h:"Planilha",w:20},{h:"Linha",w:8,fmt:"int"}],
+      semId.map(x=>[x.cl,fundoS(x.file.fundo),x.d||null,x.nat||x.item,x.doc,x.hist,x.val,x.situ,x.file.label,x.line]),
       {tab:XC.warn,empty:"Todas as receitas têm identificação",summary:semId.length?`${fmtInt(semId.length)} receitas vazias · ${fmtBRL(R.ve)}`:"Todas as receitas têm identificação",sumColor:semId.length?XC.warn:XC.ok,totals:[null,null,null,null,null,null,"sum",null,null,null]});
   }
   // Projeção de receita
