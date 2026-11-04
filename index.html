@@ -372,6 +372,10 @@ tr.total td{font-weight:700;background:var(--surface-2)}
       <div class="cbox" style="height:340px"><canvas id="cPR" aria-label="Gráfico de receita realizada e projetada por natureza"></canvas></div>
     </section>
     <section class="card">
+      <div class="row"><h2 id="hPR3">Projeção dos próximos 3 meses por natureza</h2><span class="note" id="prBaseLbl"></span></div>
+      <div class="scroll" style="max-height:560px"><table id="tPR3"></table></div>
+    </section>
+    <section class="card">
       <div class="row"><h2>Por natureza da receita</h2><span class="note">Clique numa natureza para ver mês a mês</span></div>
       <div class="scroll" style="max-height:560px"><table id="tPR"></table></div>
       <p class="note" id="prNote"></p>
@@ -973,7 +977,8 @@ function projRecData(rs){
     return {k:o.k,label,short:natShort(label),real:o.tot,n:o.n,m:o.m,avg,proj:avg*n,total:o.tot+avg*n,trend};
   }).sort((a,b)=>b.total-a.total);
   const real=list.reduce((a,x)=>a+x.real,0), proj=list.reduce((a,x)=>a+x.proj,0);
-  return {months,fut,list,real,proj,total:real+proj,base,baseM,n,lastK:months[months.length-1]};
+  const fut3=[];{let py=ly,pm=lm;for(let i=0;i<3;i++){pm++;if(pm>12){pm=1;py++}fut3.push(`${py}-${String(pm).padStart(2,"0")}`)}}
+  return {months,fut,fut3,list,real,proj,total:real+proj,base,baseM,n,lastK:months[months.length-1]};
 }
 let prList=[];
 function renderProjRec(rs){
@@ -992,6 +997,12 @@ function renderProjRec(rs){
   t.innerHTML=`<thead><tr><th>Natureza da receita</th><th class="num">Realizado</th><th class="num">Média mensal</th><th class="num">Projeção</th><th class="num">Total projetado</th><th class="num">% do total</th><th class="num">Tendência</th></tr></thead><tbody>`+
     P.list.map((x,i)=>`<tr class="click" data-pr="${i}" tabindex="0"><td class="acc long" title="${esc(x.label)}"><span class="dotc" style="background:${i<7?PR_COLORS[i]:"#9aa8b3"}"></span>${esc(x.label)}<small>${fmtInt(x.n)} receitas</small></td><td class="num">${fmtBRL(x.real)}</td><td class="num">${fmtBRL(x.avg)}</td><td class="num" style="color:var(--accent);font-weight:600">${fmtBRL(x.proj)}</td><td class="num"><b>${fmtBRL(x.total)}</b></td><td class="num">${fmtPct(x.total/T)}</td><td class="num">${x.trend==null?"–":`<span style="color:${x.trend>=0?"var(--ok)":"var(--bad)"};font-weight:600">${x.trend>=0?"▲":"▼"} ${fmtPct(Math.abs(x.trend))}</span>`}</td></tr>`).join("")+
     `<tr class="total"><td>Total</td><td class="num">${fmtBRL(P.real)}</td><td class="num">${fmtBRL(avgAll)}</td><td class="num">${fmtBRL(P.proj)}</td><td class="num">${fmtBRL(P.total)}</td><td class="num">100,0%</td><td></td></tr></tbody>`;
+  { const avgAll3=P.list.reduce((a,x)=>a+x.avg,0);
+    $("hPR3").textContent=`Projeção dos próximos 3 meses por natureza · ${mlabel(P.fut3[0])} a ${mlabel(P.fut3[2])}`;
+    $("prBaseLbl").textContent=P.base===0?"Base: média do período":`Base: média dos últimos ${P.base} meses`;
+    $("tPR3").innerHTML=`<thead><tr><th>Natureza da receita</th>${P.fut3.map(k=>`<th class="num">${mlabel(k)}</th>`).join("")}<th class="num">Total 3 meses</th><th class="num">% do total</th></tr></thead><tbody>`+
+      [...P.list].sort((p,q)=>q.avg-p.avg).map(x=>{const i=P.list.indexOf(x);return `<tr class="click" data-pr="${i}" tabindex="0"><td class="acc long" title="${esc(x.label)}"><span class="dotc" style="background:${i<7?PR_COLORS[i]:"#9aa8b3"}"></span>${esc(x.label)}</td>${P.fut3.map(()=>`<td class="num">${fmtBRL(x.avg)}</td>`).join("")}<td class="num" style="color:var(--accent);font-weight:700">${fmtBRL(x.avg*3)}</td><td class="num">${avgAll3?fmtPct(x.avg/avgAll3):"–"}</td></tr>`}).join("")+
+      `<tr class="total"><td>Total</td>${P.fut3.map(()=>`<td class="num">${fmtBRL(avgAll3)}</td>`).join("")}<td class="num">${fmtBRL(avgAll3*3)}</td><td class="num">100,0%</td></tr></tbody>`; }
   $("prNote").textContent=`Projeção = ${bl} de cada natureza, repetida nos meses seguintes até ${mlabel(P.fut[P.fut.length-1])}. Tendência compara a média dos últimos 3 meses com a dos 3 anteriores. ${P.lastK<mkey(today0)?"":"O último mês pode estar incompleto."}`;
   if(!window.Chart) return;
   const c=chartBase(), top=P.list.slice(0,7), rest=P.list.slice(7);
@@ -1464,6 +1475,10 @@ async function exportXlsxPro(){
       {h:"Natureza da receita",w:52,wrap:true,bold:true},{h:"Receitas",w:10,fmt:"int"},{h:"Realizado",w:19,fmt:"brl"},{h:"Média mensal",w:18,fmt:"brl"},{h:"Projeção",w:19,fmt:"brl"},{h:"Total projetado",w:20,fmt:"brl"},{h:"% do total",w:11,fmt:"pct"},{h:"Tendência",w:11,fmt:"pct",color:v=>typeof v==="number"?(v>=0?XC.ok:XC.bad):null}],
       PRd.list.map(x=>[x.label,x.n,+x.real.toFixed(2),+x.avg.toFixed(2),+x.proj.toFixed(2),+x.total.toFixed(2),PRd.total?x.total/PRd.total:null,x.trend]),
       {tab:XC.sky,summary:`Realizado ${fmtBRL(PRd.real)} · projeção ${fmtBRL(PRd.proj)} · total ${fmtBRL(PRd.total)} (base: ${PRd.base===0?"média do período":"média dos últimos "+PRd.base+" meses"})`,totals:[null,"sum","sum","sum","sum","sum",null,null]});
+  if(PRd) table("Projeção 3 meses",`Projeção dos próximos 3 meses por natureza · ${mlabel(PRd.fut3[0])} a ${mlabel(PRd.fut3[2])}`,[
+      {h:"Natureza da receita",w:52,wrap:true,bold:true},...PRd.fut3.map(k=>({h:mlabel(k),w:18,fmt:"brl"})),{h:"Total 3 meses",w:20,fmt:"brl"},{h:"% do total",w:11,fmt:"pct"}],
+      [...PRd.list].sort((p,q)=>q.avg-p.avg).map(x=>[x.label,+x.avg.toFixed(2),+x.avg.toFixed(2),+x.avg.toFixed(2),+(x.avg*3).toFixed(2),(()=>{const t=PRd.list.reduce((a,y)=>a+y.avg,0);return t?x.avg/t:null})()]),
+      {tab:XC.sky,summary:`Total projetado em 3 meses: ${fmtBRL(PRd.list.reduce((a,y)=>a+y.avg,0)*3)} (base: ${PRd.base===0?"média do período":"média dos últimos "+PRd.base+" meses"})`,totals:[null,"sum","sum","sum","sum",null]});
   // Outras abas
   extraRows.forEach(e=>{const pend=e.x.records.filter(x=>x.k!=="yes");if(!pend.length)return;const nm=("Pend. "+e.x.name).slice(0,31);if(wb.getWorksheet(nm))return;
     table(nm,`Aba ${e.x.name}  ·  ${fmtInt(pend.length)} pendentes`,[
