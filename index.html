@@ -159,6 +159,7 @@ section.card{background:var(--surface);border:1px solid var(--line);border-radiu
 .more{justify-self:start;background:var(--accent-soft);border-color:transparent;color:var(--accent);font-size:.84rem;padding:7px 12px}
 .more:hover{border-color:var(--accent)}
 .more .cnt{background:var(--bad-soft);color:var(--bad);border-radius:99px;padding:1px 7px;font-size:.72rem}
+.dotc{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:0}
 .split{display:flex;height:12px;border-radius:99px;overflow:hidden;background:color-mix(in srgb,var(--fg) 10%,transparent)}
 .split.mini{height:8px;min-width:120px}
 .split i{display:block;height:100%}
@@ -247,6 +248,7 @@ tr.total td{font-weight:700;background:var(--surface-2)}
     <a class="tab" href="#visao" data-v="visao">Visão geral</a>
     <a class="tab" href="#analise" data-v="analise">Análise</a>
     <a class="tab" href="#pendencias" data-v="pendencias">Pendências <span class="badge" id="bPend"></span></a>
+    <a class="tab" href="#projecao" data-v="projecao">Projeção de receita</a>
     <a class="tab" href="#planilhas" data-v="planilhas">Planilhas da conciliação <span class="badge" id="bPlan"></span></a>
   </nav>
 
@@ -356,6 +358,23 @@ tr.total td{font-weight:700;background:var(--surface-2)}
       </div>
       <div class="scroll" style="max-height:640px"><table id="tPend"></table></div>
       <p class="note">Clique numa pendência para ver todos os campos da linha. Saldo inicial e linhas-modelo vazias são ignorados.</p>
+    </section>
+  </div>
+
+  <!-- PROJEÇÃO DE RECEITA -->
+  <div class="view" id="v-projecao" hidden>
+    <section class="card">
+      <div class="row">
+        <div><h2>Projeção de receita por natureza</h2><p class="note" style="margin-top:2px">Valores das receitas realizadas mês a mês e projeção até o fim do ano</p></div>
+        <label for="prBase" style="display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)">Base da projeção <select id="prBase"><option value="3">Média dos últimos 3 meses</option><option value="6">Média dos últimos 6 meses</option><option value="0">Média do período</option></select></label>
+      </div>
+      <div class="kpis k4" id="prSum"></div>
+      <div class="cbox" style="height:340px"><canvas id="cPR" aria-label="Gráfico de receita realizada e projetada por natureza"></canvas></div>
+    </section>
+    <section class="card">
+      <div class="row"><h2>Por natureza da receita</h2><span class="note">Clique numa natureza para ver mês a mês</span></div>
+      <div class="scroll" style="max-height:560px"><table id="tPR"></table></div>
+      <p class="note" id="prNote"></p>
     </section>
   </div>
 
@@ -490,6 +509,7 @@ function detectF(cols,conc){
     ent:pick(/entidade|credor|favorecido|^autor$/),
     rec:pick(/^receita$/,/identificacao (da )?receita/),
     item:pick(/item patrimonial/),
+    nat:pick(/^natureza$/,/^natureza da receita/,/^natureza(?! da despesa)/),
     conta:pick(/^banco ?- ?cc$/,/^banco ?\/ ?conta/,/^conta corrente$/,/^banco$/)};
 }
 function readSheet(aoa,h,ci,r0,defC){
@@ -541,7 +561,7 @@ function mkRecord(o,F,line,defC){
   const val=F.valor?toNum(o[F.valor]):NaN;
   const d=F.data?toDate(o[F.data]):null;
   const an=F.analista?cellStr(o[F.analista]):"";
-  const rec=F.rec?cellStr(o[F.rec]):"", item=F.item?cellStr(o[F.item]):"", tp=F.tipo?cellStr(o[F.tipo]):"";
+  const rec=F.rec?cellStr(o[F.rec]):"", item=F.item?cellStr(o[F.item]):"", nat=F.nat?cellStr(o[F.nat]):"", tp=F.tipo?cellStr(o[F.tipo]):"";
   const cl=F.conta?(contaNorm(o[F.conta])||"(sem conta)"):(defC||"(sem conta)");
   return {raw:o,line,k,situ:k==="other"?cellStr(o[F.conc]):SITU[k],
     val:isNaN(val)?null:val,d,dias:d?Math.max(0,Math.round((today0-d)/864e5)):null,
@@ -549,7 +569,7 @@ function mkRecord(o,F,line,defC){
     doc:F.doc?cellStr(o[F.doc]):"",hist:F.hist?cellStr(o[F.hist]):"",
     analista:an?titleCase(an.toLocaleLowerCase("pt-BR")):"",
     obsA:F.obsA?cellStr(o[F.obsA]):"",ent:F.ent?cellStr(o[F.ent]):"",
-    rec,item,isRec:norm(tp).startsWith("receita"),hasId:!!rec&&rec!=="-"};
+    rec,item,nat,isRec:norm(tp).startsWith("receita"),hasId:!!rec&&rec!=="-"};
 }
 function indexFile(f){
   const m=new Map();
@@ -761,6 +781,7 @@ function render(){
   renderContas(); renderAnalistas(rs); renderTipoTable(rs); renderExtras(); renderPend(); renderPlan();
   if(st.view==="analise") renderCharts(rs);
   if(st.view==="visao") renderProj(rs);
+  if(st.view==="projecao") renderProjRec(rs);
 }
 
 function renderInsights(rs,s){
@@ -925,6 +946,66 @@ function renderProj(rs){
         tooltip:{backgroundColor:c.surf,titleColor:c.fg,bodyColor:c.fg,borderColor:c.ln,borderWidth:1,padding:10,filter:x=>x.raw!=null,
           callbacks:{label:x=>`${x.dataset.label}: ${x.raw.toLocaleString("pt-BR",{maximumFractionDigits:1})}%`,afterBody:it=>{const i=it[0].dataIndex;return i>=nR?["Projeção pelo ritmo dos últimos 3 meses"]:[`Falta para 100%: ${fmtPct(1-P.real[i].cum)}`]}}}},
       scales:{y:{min:lo,max:100,ticks:{callback:v=>v+"%"},grid:{color:c.ln}},x:{grid:{display:false}}}}});
+}
+/* ---------- projeção de receita em valores ---------- */
+const PR_COLORS=["#015079","#2f86b5","#1c7a4b","#a06b00","#7a4fa3","#b3312a","#3d8f8a","#8a6d3b"];
+function natKey(r){const n=(r.nat||r.item||"").trim();if(!n||n==="-")return {k:"~",l:"(sem natureza)"};const m=n.match(/^(\d[\d.]*)\s*-\s*(.*)$/);return m?{k:m[1],l:n}:{k:norm(n),l:n}}
+const natShort=l=>{const m=l.match(/^(\d[\d.]*)\s*-\s*(.*)$/);const t=m?m[2]:l;let s=titleCase(t.toLocaleLowerCase("pt-BR"));if(s.length>30)s=s.slice(0,29)+"…";return m?s+" ("+m[1]+")":s};
+function projRecData(rs){
+  const base=+(($("prBase")&&$("prBase").value)||3);
+  const rr=rs.filter(r=>r.isRec&&r.d&&r.val!=null);
+  if(!rr.length) return null;
+  const ks=[...new Set(rr.map(r=>mkey(r.d)))].sort();
+  const months=[]; let [yy,mm]=ks[0].split("-").map(Number); const [ly,lm]=ks[ks.length-1].split("-").map(Number);
+  while(yy<ly||(yy===ly&&mm<=lm)){months.push(`${yy}-${String(mm).padStart(2,"0")}`);mm++;if(mm>12){mm=1;yy++}}
+  let n=12-lm; if(n<1) n=12; 
+  const fut=[]; {let py=ly,pm=lm;for(let i=0;i<n;i++){pm++;if(pm>12){pm=1;py++}fut.push(`${py}-${String(pm).padStart(2,"0")}`)}}
+  const nats=new Map();
+  for(const r of rr){const {k,l}=natKey(r);const o=nats.get(k)||{k,labels:new Map(),m:new Map(),tot:0,n:0};o.labels.set(l,(o.labels.get(l)||0)+1);const mk=mkey(r.d);o.m.set(mk,(o.m.get(mk)||0)+r.val);o.tot+=r.val;o.n++;nats.set(k,o)}
+  const baseM=base===0?months:months.slice(-base);
+  const list=[...nats.values()].map(o=>{
+    const label=[...o.labels.entries()].sort((a,b)=>b[1]-a[1])[0][0];
+    const avg=baseM.reduce((a,k)=>a+(o.m.get(k)||0),0)/baseM.length;
+    const prevM=months.slice(-6,-3), lastM=months.slice(-3);
+    const a1=prevM.length?prevM.reduce((a,k)=>a+(o.m.get(k)||0),0)/prevM.length:null, a2=lastM.reduce((a,k)=>a+(o.m.get(k)||0),0)/lastM.length;
+    const trend=a1&&Math.abs(a1)>0?(a2-a1)/Math.abs(a1):null;
+    return {k:o.k,label,short:natShort(label),real:o.tot,n:o.n,m:o.m,avg,proj:avg*n,total:o.tot+avg*n,trend};
+  }).sort((a,b)=>b.total-a.total);
+  const real=list.reduce((a,x)=>a+x.real,0), proj=list.reduce((a,x)=>a+x.proj,0);
+  return {months,fut,list,real,proj,total:real+proj,base,baseM,n,lastK:months[months.length-1]};
+}
+let prList=[];
+function renderProjRec(rs){
+  const sec=$("v-projecao"); if(!sec) return;
+  const P=projRecData(rs), sum=$("prSum"), t=$("tPR");
+  if(!P){sum.innerHTML=`<p class="empty" style="padding:0">Nenhuma receita com data e valor nos filtros atuais.</p>`;t.innerHTML="";if(charts.cPR){charts.cPR.destroy();delete charts.cPR}return}
+  prList=P.list;
+  const bl=P.base===0?"média do período":`média dos últimos ${P.base} meses`;
+  const avgAll=P.list.reduce((a,x)=>a+x.avg,0);
+  sum.innerHTML=`<div class="kpi"><small>Realizado (${mlabel(P.months[0])} a ${mlabel(P.lastK)})</small><div>${fmtBRLc(P.real)}</div><span class="g100s">${fmtInt(P.list.reduce((a,x)=>a+x.n,0))} receitas</span></div>
+   <div class="kpi"><small>Média mensal · ${P.base===0?"período":"últ. "+P.base+" meses"}</small><div>${fmtBRLc(avgAll)}</div><span class="g100s">base da projeção</span></div>
+   <div class="kpi good"><small>Projeção ${mlabel(P.fut[0])}${P.n>1?" a "+mlabel(P.fut[P.fut.length-1]):""}</small><div>${fmtBRLc(P.proj)}</div><span class="g100s">${P.n} ${pl(P.n,"mês","meses")} à frente</span></div>
+   <div class="kpi"><small>Total projetado ${P.fut[P.fut.length-1].slice(0,4)}</small><div>${fmtBRLc(P.total)}</div><span class="g100s">realizado + projeção</span></div>`;
+  // tabela
+  const T=P.total||1;
+  t.innerHTML=`<thead><tr><th>Natureza da receita</th><th class="num">Realizado</th><th class="num">Média mensal</th><th class="num">Projeção</th><th class="num">Total projetado</th><th class="num">% do total</th><th class="num">Tendência</th></tr></thead><tbody>`+
+    P.list.map((x,i)=>`<tr class="click" data-pr="${i}" tabindex="0"><td class="acc long" title="${esc(x.label)}"><span class="dotc" style="background:${i<7?PR_COLORS[i]:"#9aa8b3"}"></span>${esc(x.label)}<small>${fmtInt(x.n)} receitas</small></td><td class="num">${fmtBRL(x.real)}</td><td class="num">${fmtBRL(x.avg)}</td><td class="num" style="color:var(--accent);font-weight:600">${fmtBRL(x.proj)}</td><td class="num"><b>${fmtBRL(x.total)}</b></td><td class="num">${fmtPct(x.total/T)}</td><td class="num">${x.trend==null?"–":`<span style="color:${x.trend>=0?"var(--ok)":"var(--bad)"};font-weight:600">${x.trend>=0?"▲":"▼"} ${fmtPct(Math.abs(x.trend))}</span>`}</td></tr>`).join("")+
+    `<tr class="total"><td>Total</td><td class="num">${fmtBRL(P.real)}</td><td class="num">${fmtBRL(avgAll)}</td><td class="num">${fmtBRL(P.proj)}</td><td class="num">${fmtBRL(P.total)}</td><td class="num">100,0%</td><td></td></tr></tbody>`;
+  $("prNote").textContent=`Projeção = ${bl} de cada natureza, repetida nos meses seguintes até ${mlabel(P.fut[P.fut.length-1])}. Tendência compara a média dos últimos 3 meses com a dos 3 anteriores. ${P.lastK<mkey(today0)?"":"O último mês pode estar incompleto."}`;
+  if(!window.Chart) return;
+  const c=chartBase(), top=P.list.slice(0,7), rest=P.list.slice(7);
+  const labels=[...P.months,...P.fut].map(mlabel), nR=P.months.length;
+  const mkSet=(name,col,getM,avg)=>({type:"bar",label:name,stack:"s",data:[...P.months.map(k=>+(getM(k)/1e6).toFixed(3)),...P.fut.map(()=>+(avg/1e6).toFixed(3))],
+    backgroundColor:[...P.months.map(()=>col),...P.fut.map(()=>col+"66")],borderColor:[...P.months.map(()=>col),...P.fut.map(()=>col)],borderWidth:[...P.months.map(()=>0),...P.fut.map(()=>1)],borderDash:[4,3],borderRadius:2});
+  const ds=top.map((x,i)=>mkSet(x.short,PR_COLORS[i],k=>x.m.get(k)||0,x.avg));
+  if(rest.length) ds.push(mkSet(`Outras (${rest.length})`,"#9aa8b3",k=>rest.reduce((a,x)=>a+(x.m.get(k)||0),0),rest.reduce((a,x)=>a+x.avg,0)));
+  mkChart("cPR",{data:{labels,datasets:ds},
+    options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+      plugins:{legend:{position:"bottom",labels:{boxWidth:10,boxHeight:10,usePointStyle:true}},
+        tooltip:{backgroundColor:c.surf,titleColor:c.fg,bodyColor:c.fg,borderColor:c.ln,borderWidth:1,padding:10,filter:x=>x.raw,
+          callbacks:{title:it=>it[0].label+(it[0].dataIndex>=nR?" · projeção":" · realizado"),label:x=>`${x.dataset.label}: ${fmtBRLc(x.raw*1e6)}`,footer:it=>"Total do mês: "+fmtBRLc(it.reduce((a,x)=>a+x.raw,0)*1e6)}}},
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:c.ln},ticks:{callback:v=>"R$ "+v.toLocaleString("pt-BR")+" mi"}}}},
+    plugins:[{id:"projBand",beforeDatasetsDraw(ch){const x=ch.scales.x,a=ch.chartArea;if(nR>=labels.length)return;const x0=(x.getPixelForValue(nR-1)+x.getPixelForValue(nR))/2;const ctx=ch.ctx;ctx.save();ctx.fillStyle=c.soft;ctx.globalAlpha=.55;ctx.fillRect(x0,a.top,a.right-x0,a.bottom-a.top);ctx.globalAlpha=1;ctx.fillStyle=c.mu;ctx.font="600 11px "+(css("--font-body")||"sans-serif");ctx.fillText("Projeção",x0+6,a.top+14);ctx.restore()}}]});
 }
 function pctBar(p,meta){const col=p>=(meta??st.meta)/100?"var(--ok)":"var(--bad)";return `<div class="bar"><span><i style="width:${p*100}%;background:${col}"></i></span><b style="color:${col}">${fmtPct(p)}</b></div>`}
 function renderContas(){
@@ -1376,6 +1457,12 @@ async function exportXlsxPro(){
       semId.map(x=>[x.cl,fundoS(x.file.fundo),x.d||null,x.item,x.doc,x.hist,x.val,x.situ,x.file.label,x.line]),
       {tab:XC.warn,empty:"Todas as receitas têm identificação",summary:semId.length?`${fmtInt(semId.length)} receitas vazias · ${fmtBRL(R.ve)}`:"Todas as receitas têm identificação",sumColor:semId.length?XC.warn:XC.ok,totals:[null,null,null,null,null,null,"sum",null,null,null]});
   }
+  // Projeção de receita
+  const PRd=projRecData(rs);
+  if(PRd) table("Projeção receita",`Projeção de receita por natureza até ${mlabel(PRd.fut[PRd.fut.length-1])}`,[
+      {h:"Natureza da receita",w:52,wrap:true,bold:true},{h:"Receitas",w:10,fmt:"int"},{h:"Realizado",w:19,fmt:"brl"},{h:"Média mensal",w:18,fmt:"brl"},{h:"Projeção",w:19,fmt:"brl"},{h:"Total projetado",w:20,fmt:"brl"},{h:"% do total",w:11,fmt:"pct"},{h:"Tendência",w:11,fmt:"pct",color:v=>typeof v==="number"?(v>=0?XC.ok:XC.bad):null}],
+      PRd.list.map(x=>[x.label,x.n,+x.real.toFixed(2),+x.avg.toFixed(2),+x.proj.toFixed(2),+x.total.toFixed(2),PRd.total?x.total/PRd.total:null,x.trend]),
+      {tab:XC.sky,summary:`Realizado ${fmtBRL(PRd.real)} · projeção ${fmtBRL(PRd.proj)} · total ${fmtBRL(PRd.total)} (base: ${PRd.base===0?"média do período":"média dos últimos "+PRd.base+" meses"})`,totals:[null,"sum","sum","sum","sum","sum",null,null]});
   // Outras abas
   extraRows.forEach(e=>{const pend=e.x.records.filter(x=>x.k!=="yes");if(!pend.length)return;const nm=("Pend. "+e.x.name).slice(0,31);if(wb.getWorksheet(nm))return;
     table(nm,`Aba ${e.x.name}  ·  ${fmtInt(pend.length)} pendentes`,[
@@ -1414,7 +1501,7 @@ function showMsg(t,err){const m=$("msg");m.hidden=!t;m.textContent=t;m.className
 function removeFile(i){st.files.splice(i,1);st.f.conta="";if(!st.files.length){st.files=sampleFiles();st.isSample=true}refreshFilterOptions();render();persist()}
 
 /* ---------- páginas ---------- */
-const VIEWS=["visao","analise","pendencias","planilhas"];
+const VIEWS=["visao","analise","pendencias","projecao","planilhas"];
 function go(v){if(location.hash!=="#"+v)location.hash=v;else showView(v)}
 function showView(v){
   if(!VIEWS.includes(v)) v="visao";
@@ -1425,6 +1512,7 @@ function showView(v){
   $("sampleBanner").hidden=!st.isSample||v==="planilhas";
   if(v==="analise"&&view) renderCharts(view.rs);
   if(v==="visao"&&view) renderProj(view.rs);
+  if(v==="projecao"&&view) renderProjRec(view.rs);
   if(v==="pendencias") renderPend();
   window.scrollTo({top:0});
 }
@@ -1433,6 +1521,9 @@ window.addEventListener("hashchange",()=>showView(location.hash.slice(1)));
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
+  const prr=t.closest("#tPR tr[data-pr]"); if(prr){const x=prList[+prr.dataset.pr],P=projRecData(view.rs);if(x&&P){lastFocus=document.activeElement;$("drawer").style.width="min(560px,100%)";$("dConta").textContent="Natureza da receita";$("dTitle").textContent=x.label;
+    $("dBody").innerHTML=`<div class="scroll" style="max-height:none"><table><thead><tr><th>Mês</th><th class="num">Valor</th><th></th></tr></thead><tbody>${P.months.map(k=>`<tr><td>${mlabel(k)}</td><td class="num">${fmtBRL(x.m.get(k)||0)}</td><td class="note">realizado</td></tr>`).join("")}${P.fut.map(k=>`<tr><td>${mlabel(k)}</td><td class="num" style="color:var(--accent);font-weight:600">${fmtBRL(x.avg)}</td><td class="note">projeção</td></tr>`).join("")}<tr class="total"><td>Total projetado</td><td class="num">${fmtBRL(x.total)}</td><td></td></tr></tbody></table></div>`;
+    $("scrim").hidden=$("drawer").hidden=false;$("dClose").focus()}return}
   const pmb=t.closest("[data-pm]"); if(pmb){st.projM=pmb.dataset.pm;renderProj(view.rs);return}
   const fz=t.closest("[data-fz]"); if(fz){st.f.fundo=fz.dataset.fz;st.f.conta="";syncInputs();render();return}
   const fc=t.closest(".fcard[data-fk]"); if(fc){const k=fc.dataset.fk;st.f.fundo=st.f.fundo===k?"":k;st.f.conta="";syncInputs();render();return}
@@ -1466,6 +1557,7 @@ $("btnLimparF").addEventListener("click",()=>{st.f={fundo:"",conta:"",de:"",ate:
 const metaIn=(id,key)=>$(id).addEventListener("input",e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=0&&v<=100){st[key]=v;try{localStorage.setItem("mt-"+key,String(v))}catch(_){}render()}});
 metaIn("meta","meta"); metaIn("metaR","metaR");
 $("goPlan").addEventListener("click",()=>go("planilhas"));
+$("prBase").addEventListener("change",()=>view&&renderProjRec(view.rs));
 $("recGrp").addEventListener("change",()=>view&&renderRec(view.rs));
 $("recAll").addEventListener("click",()=>{const l=view.rs.filter(r=>r.isRec&&!r.hasId);openList("Receitas sem identificação",fmtInt(l.length)+" lançamentos",l)});
 $("dClose").addEventListener("click",closeDrawer); $("scrim").addEventListener("click",closeDrawer);
@@ -1473,7 +1565,7 @@ $("fSitu").addEventListener("change",renderPend); $("busca").addEventListener("i
 $("btnRemoverTudo").addEventListener("click",()=>{st.files=sampleFiles();st.isSample=true;st.f.conta="";refreshFilterOptions();render();persist();showMsg("Planilhas removidas deste navegador.")});
 $("btnPdf").addEventListener("click",async()=>{$("btnPdf").disabled=true;try{await exportPdf()}catch(err){showMsg("Não consegui gerar o PDF: "+err.message,true)}finally{$("btnPdf").disabled=false}});
 $("btnXlsx").addEventListener("click",async()=>{$("btnXlsx").disabled=true;try{if(window.ExcelJS){try{await exportXlsxPro()}catch(e1){console.error(e1);await exportXlsx()}}else await exportXlsx()}catch(err){showMsg("Não consegui gerar o Excel: "+err.message,true)}finally{$("btnXlsx").disabled=false}});
-const rerenderCharts=()=>{if(!view)return;if(st.view==="analise")renderCharts(view.rs);if(st.view==="visao")renderProj(view.rs)};
+const rerenderCharts=()=>{if(!view)return;if(st.view==="analise")renderCharts(view.rs);if(st.view==="visao")renderProj(view.rs);if(st.view==="projecao")renderProjRec(view.rs)};
 try{matchMedia("(prefers-color-scheme: dark)").addEventListener("change",rerenderCharts)}catch(_){}
 new MutationObserver(rerenderCharts).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 
