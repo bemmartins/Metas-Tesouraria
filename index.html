@@ -245,11 +245,11 @@ tr.total td{font-weight:700;background:var(--surface-2)}
   </header>
 
   <nav class="tabs" aria-label="Páginas">
-    <a class="tab" href="#planilhas" data-v="planilhas">Upload <span class="badge" id="bPlan"></span></a>
     <a class="tab" href="#visao" data-v="visao">Visão geral</a>
     <a class="tab" href="#analise" data-v="analise">Análise</a>
     <a class="tab" href="#pendencias" data-v="pendencias">Pendências <span class="badge" id="bPend"></span></a>
     <a class="tab" href="#projecao" data-v="projecao">Projeção de receita</a>
+    <a class="tab" href="#planilhas" data-v="planilhas">Upload <span class="badge" id="bPlan"></span></a>
   </nav>
 
   <div id="msg" class="msg" hidden></div>
@@ -1702,7 +1702,6 @@ new MutationObserver(rerenderCharts).observe(document.documentElement,{attribute
     if(!saved||!saved.length){const old=await oldStore();if(old&&old.length) saved=old.map(f=>({...f,fundo:f.fundo||"",fundoAuto:false}))}
     if(saved&&saved.length){try{st.files=revive(saved);st.isSample=false;refreshFilterOptions();render();showView(st.view)}catch(err){st.files=sampleFiles();st.isSample=true;refreshFilterOptions();render();showMsg("Não consegui reabrir as planilhas guardadas. Carregue-as de novo.",true)}}
   }
-  if(!location.hash&&st.isSample) showView("planilhas");
   getDownloads();
 })();
 })();
