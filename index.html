@@ -245,11 +245,11 @@ tr.total td{font-weight:700;background:var(--surface-2)}
   </header>
 
   <nav class="tabs" aria-label="Páginas">
+    <a class="tab" href="#planilhas" data-v="planilhas">Upload <span class="badge" id="bPlan"></span></a>
     <a class="tab" href="#visao" data-v="visao">Visão geral</a>
     <a class="tab" href="#analise" data-v="analise">Análise</a>
     <a class="tab" href="#pendencias" data-v="pendencias">Pendências <span class="badge" id="bPend"></span></a>
     <a class="tab" href="#projecao" data-v="projecao">Projeção de receita</a>
-    <a class="tab" href="#planilhas" data-v="planilhas">Planilhas da conciliação <span class="badge" id="bPlan"></span></a>
   </nav>
 
   <div id="msg" class="msg" hidden></div>
@@ -333,15 +333,11 @@ tr.total td{font-weight:700;background:var(--surface-2)}
       <div class="scroll" style="max-height:none"><table id="tExtras"></table></div>
       <p class="note">Clique numa aba para ver os lançamentos pendentes dela.</p>
     </section>
-    <div class="charts2">
+    <div>
       <section class="card">
         <h2>Por tipo de lançamento</h2>
         <div class="cbox sm"><canvas id="cTipo" aria-label="Gráfico de conciliação por tipo"></canvas></div>
         <div class="scroll" style="max-height:none"><table id="tTipo"></table></div>
-      </section>
-      <section class="card">
-        <h2>Por analista</h2>
-        <div class="scroll" style="max-height:420px"><table id="tAnalista"></table></div>
       </section>
     </div>
   </div>
@@ -350,9 +346,9 @@ tr.total td{font-weight:700;background:var(--surface-2)}
   <div class="view" id="v-pendencias" hidden>
     <section class="card">
       <div class="row">
-        <h2 id="hPend">Pendências</h2>
+        <div><h2 id="hPend">Pendências</h2><p class="note" id="pendSub" style="margin-top:2px"></p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <select id="fSitu" aria-label="Situação"><option value="">Todas as situações</option><option value="no">Não</option><option value="blank">Em branco</option></select>
+          <select id="fSitu" aria-label="Situação"><option value="">Todas as situações</option><option value="no">Não</option><option value="blank">Em branco</option><option value="semid">Receita sem identificação</option></select>
           <input type="search" id="busca" placeholder="Buscar documento, histórico, valor…" aria-label="Buscar pendências">
         </div>
       </div>
@@ -365,19 +361,31 @@ tr.total td{font-weight:700;background:var(--surface-2)}
   <div class="view" id="v-projecao" hidden>
     <section class="card">
       <div class="row">
-        <div><h2>Projeção de receita por natureza</h2><p class="note" style="margin-top:2px">Valores das receitas realizadas mês a mês e projeção até o fim do ano</p></div>
+        <div><h2>Projeção de receita por natureza</h2><p class="note" style="margin-top:2px">Valores das receitas realizadas mês a mês e projeção dos próximos meses</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button type="button" id="btnYearPdf" class="primary">Relatório do ano (PDF)</button>
+        <button type="button" id="btnYearXlsx">Relatório do ano (Excel)</button>
+        </div>
         <label for="prBase" style="display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)">Base da projeção <select id="prBase"><option value="3">Média dos últimos 3 meses</option><option value="6">Média dos últimos 6 meses</option><option value="0">Média do período</option></select></label>
       </div>
       <div class="kpis k4" id="prSum"></div>
+      <div class="seg" id="prSub" role="tablist" aria-label="Subtópicos da projeção" style="justify-self:start">
+        <button type="button" data-prsub="tres" aria-pressed="true">Próximos 3 meses</button>
+        <button type="button" data-prsub="mensal" aria-pressed="false">Gráfico mensal</button>
+        <button type="button" data-prsub="natureza" aria-pressed="false">Detalhe por natureza</button>
+      </div>
+    </section>
+    <section class="card" data-sub="tres">
+      <div class="row"><h2 id="hPR3">Projeção dos próximos 3 meses por natureza</h2><span class="note" id="prBaseLbl"></span></div>
+      <div class="scroll" style="max-height:none"><table id="tPR3"></table></div>
+    </section>
+    <section class="card" data-sub="mensal" hidden>
+      <div class="row"><h2>Realizado e projetado por mês</h2><span class="note">As 7 maiores naturezas; as demais em "Outras"</span></div>
       <div class="cbox" style="height:340px"><canvas id="cPR" aria-label="Gráfico de receita realizada e projetada por natureza"></canvas></div>
     </section>
-    <section class="card">
-      <div class="row"><h2 id="hPR3">Projeção dos próximos 3 meses por natureza</h2><span class="note" id="prBaseLbl"></span></div>
-      <div class="scroll" style="max-height:560px"><table id="tPR3"></table></div>
-    </section>
-    <section class="card">
-      <div class="row"><h2>Por natureza da receita</h2><span class="note">Clique numa natureza para ver mês a mês</span></div>
-      <div class="scroll" style="max-height:560px"><table id="tPR"></table></div>
+    <section class="card" data-sub="natureza" hidden>
+      <div class="row"><h2>Detalhe por natureza da receita</h2><span class="note">Clique numa natureza para ver mês a mês</span></div>
+      <div class="scroll" style="max-height:none"><table id="tPR"></table></div>
       <p class="note" id="prNote"></p>
     </section>
   </div>
@@ -385,8 +393,8 @@ tr.total td{font-weight:700;background:var(--surface-2)}
   <!-- PLANILHAS -->
   <div class="view" id="v-planilhas" hidden>
     <section class="card">
-      <div class="row"><h2>Planilhas da conciliação por fundo</h2><button class="link" id="btnRemoverTudo" type="button" hidden>Remover todas</button></div>
-      <p class="note">Aceita os dois formatos: a planilha de conciliação do fundo (aba No Detalhe, com a coluna Banco - CC e todas as contas) e o extrato de um banco só (aba C.C). Solte cada planilha no fundo dela. Ao reenviar um arquivo com o mesmo nome, ele substitui o anterior. Tudo é lido e guardado só neste navegador.</p>
+      <div class="row"><div><h2>Upload</h2><p class="note" style="margin-top:2px;font-size:.9rem;color:var(--fg)">Carregue as planilhas de conciliação dos bancos.</p></div><button class="link" id="btnRemoverTudo" type="button" hidden>Remover todas</button></div>
+      <p class="note">Solte cada planilha no fundo dela (Administrativo, Financeiro, Previdenciário ou Militar). Aceita os dois formatos: a planilha de conciliação do fundo (aba No Detalhe, com a coluna Banco - CC e todas as contas) e o extrato de um banco só (aba C.C). Ao reenviar um arquivo com o mesmo nome, ele substitui o anterior. Tudo é lido e guardado só neste navegador.</p>
       <div class="fgrid" id="planFundos"></div>
     </section>
     <section class="card">
@@ -437,7 +445,7 @@ const fundoS=k=>(FUNDOS.find(f=>f.k===k)||{s:"—"}).s;
 const fOrd=k=>{const i=FUNDOS.findIndex(f=>f.k===k);return i<0?9:i};
 const today0=(()=>{const d=new Date();d.setHours(0,0,0,0);return d})();
 
-const st={projM:"conc",files:[],isSample:true,meta:85,metaR:85,f:{fundo:"",conta:"",de:"",ate:"",tipo:"",analista:""},sort:{k:"dias",dir:-1},insAll:false,view:"visao",use:new Map()};
+const st={projM:"conc",prSub:"tres",more:new Set(),files:[],isSample:true,meta:85,metaR:85,f:{fundo:"",conta:"",de:"",ate:"",tipo:"",analista:""},sort:{k:"dias",dir:-1},insAll:false,view:"visao",use:new Map()};
 let downloads=null, charts={}, view=null, lastSev=[], lastIns=[], recGroups=[], listShown=[], pendShown=[], pendingFundo=null, lastFocus=null;
 
 /* ---------- células ---------- */
@@ -601,7 +609,7 @@ function sampleFiles(){
   let seed=23; const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;
   const an=["Ana","Carlos","Juliana","Rafael","","",""];
   const mk=(fundo,label,contas,n,bias,decay,idRate)=>{
-    const cols=["Banco - CC","Tipo","Tipo item patrimonial","DATA","Doc.","LANÇAMENTO","VALOR","RECEITA","Conciliado","Analista","Observação do analista"];
+    const cols=["Banco - CC","Tipo","Tipo item patrimonial","Natureza","DATA","Doc.","LANÇAMENTO","VALOR","RECEITA","Conciliado","Analista","Observação do analista"];
     const F=detectF(cols,"Conciliado");
     const records=[];
     for(let i=1;i<=n;i++){
@@ -610,7 +618,7 @@ function sampleFiles(){
       const b=day>250?bias-decay:bias; const r=rnd();
       const o={"Banco - CC":contas[Math.floor(rnd()*contas.length)],"Tipo":tipo,"DATA":d,"Doc.":"2026"+(tipo==="RECEITA"?"GR":"OB")+String(10000+Math.floor(rnd()*9000)),"LANÇAMENTO":tipo==="RECEITA"?"870 Transferência recebida":tipo==="DESPESA"?"109 Pagamento":"438 TED","VALOR":Math.round((rnd()*24000+35)*100)/100*(tipo==="RECEITA"?1:-1),"Conciliado":r<b?"Sim":r<b+.05?"":"Não","Analista":an[Math.floor(rnd()*an.length)],"Observação do analista":""};
       if(o.Conciliado!=="Sim"&&rnd()<.4)o["Observação do analista"]="Aguardando documento de suporte.";
-      if(tipo==="RECEITA"){const c=rnd();o["Tipo item patrimonial"]=c<.7?"208 - CONTRIBUIÇÃO DE SERVIDOR INATIVO":c<.95?"185 - COMPENSAÇÃO PREVIDENCIÁRIA - CRÉDITOS":"Não Encontrado";o["RECEITA"]=rnd()<idRate?(c<.7?"Comprovante de Resgate Precatório Estadual":"Compensação Previdenciária: COMPREV"):""}
+      if(tipo==="RECEITA"){const c=rnd();o["Tipo item patrimonial"]=c<.7?"208 - CONTRIBUIÇÃO DE SERVIDOR INATIVO":c<.95?"185 - COMPENSAÇÃO PREVIDENCIÁRIA - CRÉDITOS":"Não Encontrado";const c2=rnd();o["Natureza"]=c<.7?(c2<.55?"1215015101 - CONTRIBUIÇÃO SERVIDOR CIVIL INATIVO AO RPPS":c2<.85?"1215011101 - CONTRIBUIÇÃO DO SERVIDOR CIVIL ATIVO PARA O RPPS":"7215011101 - REC INTRAORÇ - CONTRIBUIÇÃO PATRONAL"):c<.95?"1999030101 - COMPENSAÇÕES FINANC ENTRE O REGIME GERAL E RPPS":"Não Encontrado";o["RECEITA"]=rnd()<idRate?(c<.7?"Comprovante de Resgate Precatório Estadual":"Compensação Previdenciária: COMPREV"):""}
       records.push(mkRecord(o,F,i+8,""));
     }
     const f={label,file:label+".xlsx",fundo,fundoAuto:false,kind:"conc",defC:"",sheet:"No Detalhe",title:"Exemplo fictício",cols,F,records,extras:[],loadedAt:new Date()};
@@ -779,10 +787,10 @@ function render(){
   $("tagExemplo").hidden=!st.isSample; $("sampleBanner").hidden=!st.isSample||st.view==="planilhas";
   $("btnRemoverTudo").hidden=st.isSample;
   $("btnLimparF").hidden=!Object.values(st.f).some(Boolean);
-  $("bPend").textContent=s.pend?fmtInt(s.pend):"";
+  {const np=rs.filter(r=>r.k!=="yes"||semId(r)).length;$("bPend").textContent=np?fmtInt(np):"";}
   const att=st.isSample?0:st.files.filter(f=>f.error||!f.fundo||f.fundoAuto).length; $("bPlan").textContent=att?String(att):"";
   renderBoxes(rs,s); renderFundos(); renderInsights(rs,s); renderRec(rs);
-  renderContas(); renderAnalistas(rs); renderTipoTable(rs); renderExtras(); renderPend(); renderPlan();
+  renderContas(); renderTipoTable(rs); renderExtras(); renderPend(); renderPlan();
   if(st.view==="analise") renderCharts(rs);
   if(st.view==="visao") renderProj(rs);
   if(st.view==="projecao") renderProjRec(rs);
@@ -954,7 +962,7 @@ function renderProj(rs){
 }
 /* ---------- projeção de receita em valores ---------- */
 const PR_COLORS=["#015079","#2f86b5","#1c7a4b","#a06b00","#7a4fa3","#b3312a","#3d8f8a","#8a6d3b"];
-function natKey(r){const n=(r.nat||r.item||"").trim();if(!n||n==="-")return {k:"~",l:"(sem natureza)"};const m=n.match(/^(\d[\d.]*)\s*-\s*(.*)$/);return m?{k:m[1],l:n}:{k:norm(n),l:n}}
+function natKey(r){const n=(r.nat||"").trim();if(!n||n==="-")return {k:"~",l:"(sem natureza)"};const m=n.match(/^(\d[\d.]*)\s*-\s*(.*)$/);return m?{k:m[1],l:n}:{k:norm(n),l:n}}
 const natShort=l=>{const m=l.match(/^(\d[\d.]*)\s*-\s*(.*)$/);const t=m?m[2]:l;let s=titleCase(t.toLocaleLowerCase("pt-BR"));if(s.length>30)s=s.slice(0,29)+"…";return m?s+" ("+m[1]+")":s};
 function projRecData(rs){
   const base=+(($("prBase")&&$("prBase").value)||3);
@@ -1056,11 +1064,13 @@ function renderExtras(){
 }
 
 /* ---------- pendências ---------- */
-const PCOLS=[["conta","Conta"],["fundo","Fundo"],["situ","Situação"],["d","Data"],["dias","Dias"],["tipo","Tipo"],["doc","Documento"],["hist","Histórico"],["val","Valor"],["analista","Analista"],["obsA","Obs. do analista"]];
+const PCOLS=[["conta","Conta"],["fundo","Fundo"],["situ","Conciliado"],["ident","Identificação"],["d","Data"],["dias","Dias"],["tipo","Tipo"],["doc","Documento"],["hist","Histórico"],["val","Valor"],["analista","Analista"],["obsA","Obs. do analista"]];
+const semId=r=>r.isRec&&!r.hasId&&!!(r.file&&r.file.F&&r.file.F.rec);
+function pendAll(){return view.rs.filter(r=>r.k!=="yes"||semId(r))}
 function pendList(){
   const q=norm($("busca").value), sf=$("fSitu").value;
-  let p=view.rs.filter(r=>r.k!=="yes");
-  if(sf) p=p.filter(r=>sf==="blank"?(r.k==="blank"||r.k==="other"):r.k===sf);
+  let p=pendAll();
+  if(sf) p=p.filter(r=>sf==="semid"?semId(r):sf==="blank"?(r.k==="blank"||r.k==="other"):r.k===sf);
   if(q) p=p.filter(r=>norm([r.cl,fundoNome(r.file.fundo),r.situ,r.tipo,r.doc,r.hist,r.analista,r.obsA,r.ent,r.d?r.d.toLocaleDateString("pt-BR"):"",r.val!=null?fmtBRL(Math.abs(r.val)):"",r.val!=null?String(r.val):""].join(" ")).includes(q));
   const {k,dir}=st.sort;
   const key=r=>k==="conta"?r.cl:k==="fundo"?String(fOrd(r.file.fundo)):k==="val"?(r.val==null?-1:Math.abs(r.val)):k==="d"?(r.d?+r.d:0):k==="dias"?(r.dias??-1):(r[k]||"");
@@ -1069,12 +1079,14 @@ function pendList(){
 }
 function renderPend(){
   if(!view) return;
-  const all=view.rs.filter(r=>r.k!=="yes"); const p=pendList();
+  const all=pendAll(); const p=pendList();
   const multi=new Set(view.rs.map(r=>r.key)).size>1, multiF=new Set(view.rs.map(r=>r.file.fundo)).size>1;
   const cols=PCOLS.filter(([k])=>(k!=="conta"||multi)&&(k!=="fundo"||multiF)&&(k!=="obsA"||all.some(r=>r.obsA))&&(k!=="analista"||all.some(r=>r.analista))&&(k!=="doc"||all.some(r=>r.doc)));
-  $("hPend").textContent=`Pendências de conciliação (${fmtInt(all.length)})`;
+  {const nc=all.filter(r=>r.k!=="yes").length, ni=all.filter(semId).length;
+   $("hPend").textContent=`Pendências (${fmtInt(all.length)})`;
+   $("pendSub").textContent=`${fmtInt(nc)} de conciliação · ${fmtInt(ni)} receitas sem identificação${nc+ni>all.length?` · ${fmtInt(nc+ni-all.length)} nos dois casos`:""}`;}
   const t=$("tPend");
-  if(!all.length){t.innerHTML=`<tbody><tr><td class="empty">Nenhuma pendência. Tudo conciliado.</td></tr></tbody>`;return}
+  if(!all.length){t.innerHTML=`<tbody><tr><td class="empty">Nenhuma pendência. Tudo conciliado e todas as receitas identificadas.</td></tr></tbody>`;return}
   const arr=k=>st.sort.k===k?`<span>${st.sort.dir>0?" ▲":" ▼"}</span>`:"";
   const numK=["val","dias"];
   pendShown=p.slice(0,500);
@@ -1083,6 +1095,7 @@ function renderPend(){
       if(k==="conta")return `<td>${esc(r.cl)}</td>`;
       if(k==="fundo")return `<td>${r.file.fundo?`<span class="chip f">${fundoS(r.file.fundo)}</span>`:"–"}</td>`;
       if(k==="situ")return `<td><span class="chip ${r.k}">${esc(r.situ)}</span></td>`;
+      if(k==="ident")return `<td>${!r.isRec?'<span class="note">–</span>':r.hasId?'<span class="chip yes">Preenchida</span>':'<span class="chip blank">Vazia</span>'}</td>`;
       if(k==="d")return `<td>${r.d?r.d.toLocaleDateString("pt-BR"):"–"}</td>`;
       if(k==="dias")return `<td class="num"><span class="age ${r.dias>90?"a3":r.dias>30?"a2":""}">${r.dias??"–"}</span></td>`;
       if(k==="val")return `<td class="num">${r.val!=null?fmtBRL(r.val):"–"}</td>`;
@@ -1125,7 +1138,7 @@ function openList(title,sub,list,third){
   $("drawer").style.width="min(800px,100%)"; $("dConta").textContent=sub; $("dTitle").textContent=title;
   const multi=new Set(list.map(r=>r.key||r.cl)).size>1;
   const th3=third==="hist"?"Lançamento":"Natureza";
-  $("dBody").innerHTML=!list.length?`<p class="empty">Nada aqui.</p>`:`<div class="scroll" style="max-height:none"><table><thead><tr>${multi?"<th>Conta</th>":""}<th>Data</th><th>Documento</th><th>${th3}</th><th class="num">Valor</th><th>Conciliado</th><th class="num">Linha</th></tr></thead><tbody>${list.map((r,i)=>{const v3=third==="hist"?(r.ent||r.hist):(r.nat||r.item);return `<tr class="click" data-l="${i}" tabindex="0">${multi?`<td>${esc(r.cl)}</td>`:""}<td>${r.d?r.d.toLocaleDateString("pt-BR"):"–"}</td><td>${esc(r.doc)}</td><td class="long" title="${esc(v3)}">${esc(v3)}</td><td class="num">${r.val!=null?fmtBRL(r.val):"–"}</td><td><span class="chip ${r.k}">${esc(r.situ)}</span></td><td class="num">${r.line}</td></tr>`}).join("")}</tbody></table></div><p class="note">Clique numa linha para ver todos os campos. Linha é a linha na planilha original.</p>`;
+  $("dBody").innerHTML=!list.length?`<p class="empty">Nada aqui.</p>`:`<div class="scroll" style="max-height:none"><table><thead><tr>${multi?"<th>Conta</th>":""}<th>Data</th><th>Documento</th><th>${th3}</th><th class="num">Valor</th><th>Conciliado</th><th class="num">Linha</th></tr></thead><tbody>${list.map((r,i)=>{const v3=third==="hist"?(r.ent||r.hist):(r.nat||"(sem natureza)");return `<tr class="click" data-l="${i}" tabindex="0">${multi?`<td>${esc(r.cl)}</td>`:""}<td>${r.d?r.d.toLocaleDateString("pt-BR"):"–"}</td><td>${esc(r.doc)}</td><td class="long" title="${esc(v3)}">${esc(v3)}</td><td class="num">${r.val!=null?fmtBRL(r.val):"–"}</td><td><span class="chip ${r.k}">${esc(r.situ)}</span></td><td class="num">${r.line}</td></tr>`}).join("")}</tbody></table></div><p class="note">Clique numa linha para ver todos os campos. Linha é a linha na planilha original.</p>`;
   $("scrim").hidden=$("drawer").hidden=false; $("dClose").focus();
 }
 function closeDrawer(){$("scrim").hidden=$("drawer").hidden=true;if(lastFocus&&lastFocus.focus)lastFocus.focus()}
@@ -1173,7 +1186,7 @@ async function exportXlsx(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(resumo.length?resumo:[{"Conta":"Nenhuma conta"}],opt),"Contas");
   const rows=p.map(r=>({"Conta":r.cl,"Fundo":fundoNome(r.file.fundo),"Planilha":r.file.label,"Linha na planilha":r.line,"Situação":r.situ,"Data":r.d||"","Dias em aberto":r.dias??"","Tipo":r.tipo,"Documento":r.doc,"Histórico":r.hist,"Entidade / Credor":r.ent,"Valor":r.val??"","Analista":r.analista,"Observação do analista":r.obsA}));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{"Conta":"Nenhuma pendência"}],opt),"Pendências");
-  if(hasRecCol()){const semId=rs.filter(r=>r.isRec&&!r.hasId);XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(semId.length?semId.map(r=>({"Conta":r.cl,"Fundo":fundoNome(r.file.fundo),"Planilha":r.file.label,"Linha na planilha":r.line,"Data":r.d||"","Natureza":r.nat||r.item,"Documento":r.doc,"Lançamento":r.hist,"Valor":r.val??"","Conciliado":r.situ})):[{"Conta":"Todas as receitas têm identificação"}],opt),"Receitas sem identificação")}
+  if(hasRecCol()){const semId=rs.filter(r=>r.isRec&&!r.hasId);XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(semId.length?semId.map(r=>({"Conta":r.cl,"Fundo":fundoNome(r.file.fundo),"Planilha":r.file.label,"Linha na planilha":r.line,"Data":r.d||"","Natureza":r.nat||"(sem natureza)","Documento":r.doc,"Lançamento":r.hist,"Valor":r.val??"","Conciliado":r.situ})):[{"Conta":"Todas as receitas têm identificação"}],opt),"Receitas sem identificação")}
   extraRows.forEach(e=>{const pend=e.x.records.filter(r=>r.k!=="yes");if(!pend.length)return;const nm=("Pend. "+e.x.name).slice(0,31);if(wb.SheetNames.includes(nm))return;XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(pend.map(r=>({"Planilha":e.f.label,"Linha na planilha":r.line,"Data":r.d||"","Tipo":r.tipo,"Documento":r.doc,"Lançamento":r.hist,"Autor / Entidade":r.ent,"Valor":r.val??"","Conciliado":r.situ})),opt),nm)});
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array",cellDates:true});
   await save(`metas-tesouraria-${stamp()}.xlsx`,new Blob([out]));
@@ -1453,9 +1466,9 @@ async function exportXlsxPro(){
     cl.map(({u,a,b})=>[u.label,fundoNome(u.fundo),st.files[u.fi].label,a.last||null,a.total,a.yes,a.pend,a.total?a.pct:null,needFor(a.yes,a.total,st.meta).need,+a.vp.toFixed(2),a.pend?a.old:null,b.total||null,b.total?b.pct:null]),
     {summary:`${fmtInt(cl.length)} contas · ${fmtPct(s.pct)} conciliado · faltam ${fmtInt(s.pend)} para 100%`,totals:[null,null,null,null,"sum","sum","sum",null,"sum","sum",null,"sum",null]});
   // Pendências
-  const pRows=pendList().map(x=>[x.cl,fundoS(x.file.fundo),x.situ,x.d||null,x.dias,x.tipo,x.doc,x.hist,x.ent,x.val,x.analista,x.obsA,x.file.label,x.line]);
+  const pRows=pendList().map(x=>[x.cl,fundoS(x.file.fundo),x.situ,!x.isRec?"–":x.hasId?"Preenchida":"Vazia",x.d||null,x.dias,x.tipo,x.doc,x.hist,x.ent,x.val,x.analista,x.obsA,x.file.label,x.line]);
   table(SHEETS.pend,`Pendências de conciliação  ·  ${fmtInt(pRows.length)}`,[
-    {h:"Conta",w:17,bold:true},{h:"Fundo",w:8},{h:"Situação",w:11,color:v=>v==="Não"?XC.bad:XC.warn},{h:"Data",w:12,fmt:"date"},{h:"Dias",w:8,fmt:"int",color:v=>v>90?XC.bad:v>30?XC.warn:null},{h:"Tipo",w:11},{h:"Documento",w:16},{h:"Histórico",w:32,wrap:true},{h:"Entidade / Credor",w:28,wrap:true},{h:"Valor",w:18,fmt:"brl"},{h:"Analista",w:12},{h:"Obs. do analista",w:36,wrap:true},{h:"Planilha",w:20},{h:"Linha",w:8,fmt:"int"}],
+    {h:"Conta",w:17,bold:true},{h:"Fundo",w:8},{h:"Conciliado",w:11,color:v=>v==="Não"?XC.bad:v==="Sim"?XC.ok:XC.warn},{h:"Identificação",w:13,color:v=>v==="Vazia"?XC.warn:null},{h:"Data",w:12,fmt:"date"},{h:"Dias",w:8,fmt:"int",color:v=>v>90?XC.bad:v>30?XC.warn:null},{h:"Tipo",w:11},{h:"Documento",w:16},{h:"Histórico",w:32,wrap:true},{h:"Entidade / Credor",w:28,wrap:true},{h:"Valor",w:18,fmt:"brl"},{h:"Analista",w:12},{h:"Obs. do analista",w:36,wrap:true},{h:"Planilha",w:20},{h:"Linha",w:8,fmt:"int"}],
     pRows,{tab:XC.bad,empty:"Nenhuma pendência",sumColor:s.pend?XC.bad:XC.ok,summary:s.pend?`${fmtInt(s.pend)} pendências · ${fmtBRL(s.vp)} em aberto · a mais antiga tem ${s.old} dias`:"Nenhuma pendência",totals:[null,null,null,null,null,null,null,null,null,"sum",null,null,null,null]});
   // Receita
   if(hasRecCol()){
@@ -1466,7 +1479,7 @@ async function exportXlsxPro(){
     const semId=rs.filter(x=>x.isRec&&!x.hasId);
     table(SHEETS.vaz,`Receitas sem identificação  ·  ${fmtInt(semId.length)}`,[
       {h:"Conta",w:17,bold:true},{h:"Fundo",w:8},{h:"Data",w:12,fmt:"date"},{h:"Natureza",w:42,wrap:true},{h:"Documento",w:16},{h:"Lançamento",w:30,wrap:true},{h:"Valor",w:18,fmt:"brl"},{h:"Conciliado",w:11,color:v=>v==="Sim"?XC.ok:XC.bad},{h:"Planilha",w:20},{h:"Linha",w:8,fmt:"int"}],
-      semId.map(x=>[x.cl,fundoS(x.file.fundo),x.d||null,x.nat||x.item,x.doc,x.hist,x.val,x.situ,x.file.label,x.line]),
+      semId.map(x=>[x.cl,fundoS(x.file.fundo),x.d||null,x.nat||"(sem natureza)",x.doc,x.hist,x.val,x.situ,x.file.label,x.line]),
       {tab:XC.warn,empty:"Todas as receitas têm identificação",summary:semId.length?`${fmtInt(semId.length)} receitas vazias · ${fmtBRL(R.ve)}`:"Todas as receitas têm identificação",sumColor:semId.length?XC.warn:XC.ok,totals:[null,null,null,null,null,null,"sum",null,null,null]});
   }
   // Projeção de receita
@@ -1534,12 +1547,105 @@ function showView(v){
 }
 window.addEventListener("hashchange",()=>showView(location.hash.slice(1)));
 
+/* ---------- relatório anual de receitas ---------- */
+function yearData(rs){
+  const P=projRecData(rs); if(!P) return null;
+  const yr=+P.lastK.slice(0,4);
+  const ms=[...Array(12)].map((_,i)=>`${yr}-${String(i+1).padStart(2,"0")}`);
+  const isP=k=>k>P.lastK, first=P.months[0];
+  const rows=P.list.map(x=>{const v=ms.map(k=>k<first?null:isP(k)?x.avg:(x.m.get(k)||0));return {label:x.label,v,real:v.reduce((a,b,i)=>a+(!isP(ms[i])&&b?b:0),0),proj:v.reduce((a,b,i)=>a+(isP(ms[i])&&b?b:0),0)}}).map(r=>({...r,tot:r.real+r.proj})).sort((a,b)=>b.tot-a.tot);
+  const colT=ms.map((_,i)=>rows.reduce((a,r)=>a+(r.v[i]||0),0));
+  const real=rows.reduce((a,r)=>a+r.real,0), proj=rows.reduce((a,r)=>a+r.proj,0);
+  return {P,yr,ms,isP,rows,colT,real,proj,tot:real+proj,nP:ms.filter(isP).length};
+}
+async function exportYearPdf(){
+  if(!window.jspdf){showMsg("A biblioteca do PDF não carregou. Recarregue a página.",true);return}
+  const Y=yearData(view.rs); if(!Y){showMsg("Não há receitas com data e valor para o relatório.",true);return}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),L=36;
+  const ink=[19,32,42],mut=[89,106,119],acc=[1,80,121],line=[213,222,229];
+  const big=Y.tot>=1e7, div=big?1e6:1e3, unit=big?"R$ milhões":"R$ mil";
+  const nf=v=>v==null?"–":(v/div).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
+  doc.setFillColor(...acc);doc.rect(0,0,W,54,"F");doc.setFillColor(47,134,181);doc.rect(0,54,W,3,"F");
+  let tx=L; if(BRAND.logo){try{doc.addImage(BRAND.logo,"JPEG",L,10,34,34);tx=L+44}catch(_){}}
+  doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(16);doc.text(`Receitas ${Y.yr} por natureza`,tx,30);
+  doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(214,230,240);
+  doc.text(`${st.isSample?"DADOS DE EXEMPLO · ":""}${scopeLabel().replace(" · com filtros","")} · realizado até ${mlabel(Y.P.lastK)}, projeção pela ${Y.P.base===0?"média do período":"média dos últimos "+Y.P.base+" meses"}`,tx,44);
+  doc.setFontSize(8);doc.text(BRAND.org,W-L,26,{align:"right"});doc.text("Gerado em "+new Date().toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}),W-L,38,{align:"right"});
+  // resumo
+  let y=78; const kw=(W-2*L-24)/4;
+  [["Realizado",fmtBRL(Y.real)],[`Projetado (${Y.nP} ${pl(Y.nP,"mês","meses")})`,fmtBRL(Y.proj)],[`Total ${Y.yr}`,fmtBRL(Y.tot)],["Naturezas",fmtInt(Y.rows.length)]].forEach(([a,b],i)=>{const x=L+i*(kw+8);
+    doc.setFillColor(244,247,249);doc.setDrawColor(...line);doc.roundedRect(x,y,kw,38,4,4,"FD");doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(...mut);doc.text(a.toUpperCase(),x+10,y+13);doc.setFont("helvetica","bold");doc.setFontSize(11);doc.setTextColor(...(i===1?acc:ink));doc.text(b,x+10,y+29)});
+  y+=52;
+  doc.setFont("helvetica","italic");doc.setFontSize(7.5);doc.setTextColor(...mut);doc.text(`Valores em ${unit}. Meses em azul e itálico são projetados.`,L,y);y+=6;
+  const head=[["Natureza da receita",...Y.ms.map(k=>mlabel(k).slice(0,3)+(Y.isP(k)?"*":"")),"Total"]];
+  const body=[...Y.rows.map(r=>[r.label,...r.v.map(nf),nf(r.tot)]),["Total",...Y.colT.map(nf),nf(Y.tot)]];
+  doc.autoTable({startY:y,head,body,theme:"grid",
+    headStyles:{fillColor:acc,textColor:255,fontStyle:"bold",fontSize:7,halign:"right",cellPadding:3},
+    styles:{fontSize:6.8,cellPadding:{top:2.5,bottom:2.5,left:3,right:3},textColor:ink,lineColor:line,lineWidth:.3,overflow:"ellipsize"},
+    alternateRowStyles:{fillColor:[244,247,249]},columnStyles:{0:{cellWidth:190,halign:"left"},13:{fontStyle:"bold"}},margin:{left:L,right:L},
+    didParseCell:d=>{if(d.column.index===0&&d.section==="head")d.cell.styles.halign="left";if(d.column.index>0)d.cell.styles.halign="right";
+      if(d.column.index>0&&d.column.index<13&&Y.isP(Y.ms[d.column.index-1])){if(d.section==="body"){d.cell.styles.textColor=acc;d.cell.styles.fontStyle="italic"}else d.cell.styles.fillColor=[47,134,181]}
+      if(d.section==="body"&&d.row.index===d.table.body.length-1){d.cell.styles.fontStyle="bold";d.cell.styles.fillColor=[225,236,243]}}});
+  const n=doc.internal.getNumberOfPages();
+  for(let i=1;i<=n;i++){doc.setPage(i);doc.setDrawColor(...line);doc.setLineWidth(.5);doc.line(L,H-30,W-L,H-30);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(...mut);doc.text(`Metas – Tesouraria · ${BRAND.org}`,L,H-18);doc.text(`Criado por ${BRAND.autor} · página ${i} de ${n}`,W-L,H-18,{align:"right"})}
+  await save(`receitas-${Y.yr}-por-natureza-${stamp()}.pdf`,doc.output("blob"));
+}
+async function exportYearXlsx(){
+  const Y=yearData(view.rs); if(!Y){showMsg("Não há receitas com data e valor para o relatório.",true);return}
+  const hdr=["Natureza da receita",...Y.ms.map(k=>mlabel(k)+(Y.isP(k)?" (proj.)":"")),"Realizado","Projetado","Total "+Y.yr];
+  const rows=Y.rows.map(r=>[r.label,...r.v.map(v=>v==null?null:+v.toFixed(2)),+r.real.toFixed(2),+r.proj.toFixed(2),+r.tot.toFixed(2)]);
+  if(!window.ExcelJS){
+    const ws=XLSX.utils.aoa_to_sheet([hdr,...rows,["Total",...Y.colT.map(v=>+v.toFixed(2)),+Y.real.toFixed(2),+Y.proj.toFixed(2),+Y.tot.toFixed(2)]]);
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Receitas "+Y.yr);
+    await save(`receitas-${Y.yr}-por-natureza-${stamp()}.xlsx`,new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})]));return;
+  }
+  const wb=new ExcelJS.Workbook(); wb.creator=BRAND.autor;
+  const t=wb.addWorksheet("Receitas "+Y.yr,{properties:{tabColor:{argb:XC.blue}},views:[{state:"frozen",xSplit:1,ySplit:6,showGridLines:false}]});
+  xPage(t,false); const n=hdr.length;
+  t.getColumn(1).width=56; for(let i=2;i<=n;i++)t.getColumn(i).width=i>13?19:16;
+  xBand(t,n);
+  const a1=t.getCell(1,1);a1.value=`Receitas ${Y.yr} por natureza`;a1.font=xfont(15,true,XC.white);a1.alignment={vertical:"middle",indent:1};
+  const a2=t.getCell(2,1);a2.value=`${scopeLabel()} · ${BRAND.org} · realizado até ${mlabel(Y.P.lastK)}`;a2.font=xfont(9,false,"FFE3EEF5");a2.alignment={indent:1};
+  const s4=t.getCell(4,1);s4.value=`Realizado ${fmtBRL(Y.real)} · projetado ${fmtBRL(Y.proj)} · total ${fmtBRL(Y.tot)} · projeção pela ${Y.P.base===0?"média do período":"média dos últimos "+Y.P.base+" meses"} (colunas azul-claro)`;s4.font=xfont(10,true);s4.alignment={indent:1};
+  hdr.forEach((h,i)=>{const c=t.getCell(6,i+1);c.value=h;const pj=i>0&&i<13&&Y.isP(Y.ms[i-1]);c.fill=xf(pj?XC.sky:XC.blue);c.font=xfont(9,true,XC.white);c.alignment={horizontal:i?"right":"left",vertical:"middle",wrapText:true,indent:i?0:1}});
+  t.getRow(6).height=30;
+  [...rows,["Total",...Y.colT.map(v=>+v.toFixed(2)),+Y.real.toFixed(2),+Y.proj.toFixed(2),+Y.tot.toFixed(2)]].forEach((r,ri)=>{const rr=7+ri, isT=ri===rows.length, z=ri%2===1;
+    r.forEach((v,i)=>{const c=t.getCell(rr,i+1);c.value=v;const pj=i>0&&i<13&&Y.isP(Y.ms[i-1]);
+      c.fill=xf(isT?XC.soft:pj?"FFEAF3F9":z?XC.zebra:XC.white);c.border={bottom:isT?{style:"medium",color:{argb:XC.blue}}:xthin};
+      c.font=xfont(10,isT||i===0||i===n-1,pj?XC.blue:XC.ink,pj&&!isT?{italic:true}:{});
+      if(i>0){c.numFmt=FMT.brl;c.alignment={horizontal:"right",vertical:"middle"}}else c.alignment={vertical:"middle",wrapText:true,indent:1}})});
+  const fr=7+rows.length+2;const fc=t.getCell(fr,1);fc.value=`Metas – Tesouraria · ${BRAND.org} · criado por ${BRAND.autor}`;fc.font=xfont(8,false,XC.muted,{italic:true});
+  const buf=await wb.xlsx.writeBuffer();
+  await save(`receitas-${Y.yr}-por-natureza-${stamp()}.xlsx`,new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+}
+
+/* ---------- subtópicos e "ver mais" ---------- */
+function showPrSub(k){st.prSub=k;document.querySelectorAll("#prSub [data-prsub]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.prsub===k)));document.querySelectorAll("#v-projecao [data-sub]").forEach(sec=>{sec.hidden=sec.dataset.sub!==k});if(k==="mensal"&&view)renderProjRec(view.rs)}
+const MORE={tPR3:8,tPR:8,tRec:8,tConta:10,tTipo:8,tPend:25,tExtras:8,tPlan:10};
+function moreRows(id,n){
+  const t=$(id); if(!t) return;
+  const rows=[...t.querySelectorAll("tbody tr")].filter(r=>!r.classList.contains("total")&&!r.querySelector("td.empty"));
+  const wrap=t.closest(".scroll")||t; let b=document.getElementById(id+"-more");
+  if(rows.length<=n){rows.forEach(r=>r.hidden=false);if(b)b.remove();return}
+  const open=st.more.has(id);
+  rows.forEach((r,i)=>{r.hidden=i>=n&&!open});
+  if(!b){b=document.createElement("button");b.type="button";b.className="more";b.id=id+"-more";wrap.after(b);
+    b.addEventListener("click",()=>{if(st.more.has(id))st.more.delete(id);else st.more.add(id);moreRows(id,n);if(!st.more.has(id))wrap.scrollIntoView({block:"nearest"})})}
+  b.setAttribute("aria-expanded",String(open));
+  b.innerHTML=open?`Mostrar menos <span aria-hidden="true">▴</span>`:`Ver mais ${fmtInt(rows.length-n)} <span aria-hidden="true">▾</span>`;
+}
+function applyMore(){Object.entries(MORE).forEach(([id,n])=>moreRows(id,n))}
+{const wrap=(f)=>function(){const r=f.apply(this,arguments);applyMore();return r};
+ render=wrap(render);renderPend=wrap(renderPend);renderProjRec=wrap(renderProjRec);renderRec=wrap(renderRec);}
+
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
   const prr=t.closest("#tPR tr[data-pr]"); if(prr){const x=prList[+prr.dataset.pr],P=projRecData(view.rs);if(x&&P){lastFocus=document.activeElement;$("drawer").style.width="min(560px,100%)";$("dConta").textContent="Natureza da receita";$("dTitle").textContent=x.label;
     $("dBody").innerHTML=`<div class="scroll" style="max-height:none"><table><thead><tr><th>Mês</th><th class="num">Valor</th><th></th></tr></thead><tbody>${P.months.map(k=>`<tr><td>${mlabel(k)}</td><td class="num">${fmtBRL(x.m.get(k)||0)}</td><td class="note">realizado</td></tr>`).join("")}${P.fut.map(k=>`<tr><td>${mlabel(k)}</td><td class="num" style="color:var(--accent);font-weight:600">${fmtBRL(x.avg)}</td><td class="note">projeção</td></tr>`).join("")}<tr class="total"><td>Total projetado</td><td class="num">${fmtBRL(x.total)}</td><td></td></tr></tbody></table></div>`;
     $("scrim").hidden=$("drawer").hidden=false;$("dClose").focus()}return}
+  const psb=t.closest("[data-prsub]"); if(psb){showPrSub(psb.dataset.prsub);return}
   const pmb=t.closest("[data-pm]"); if(pmb){st.projM=pmb.dataset.pm;renderProj(view.rs);return}
   const fz=t.closest("[data-fz]"); if(fz){st.f.fundo=fz.dataset.fz;st.f.conta="";syncInputs();render();return}
   const fc=t.closest(".fcard[data-fk]"); if(fc){const k=fc.dataset.fk;st.f.fundo=st.f.fundo===k?"":k;st.f.conta="";syncInputs();render();return}
@@ -1577,8 +1683,10 @@ $("prBase").addEventListener("change",()=>view&&renderProjRec(view.rs));
 $("recGrp").addEventListener("change",()=>view&&renderRec(view.rs));
 $("recAll").addEventListener("click",()=>{const l=view.rs.filter(r=>r.isRec&&!r.hasId);openList("Receitas sem identificação",fmtInt(l.length)+" lançamentos",l)});
 $("dClose").addEventListener("click",closeDrawer); $("scrim").addEventListener("click",closeDrawer);
-$("fSitu").addEventListener("change",renderPend); $("busca").addEventListener("input",renderPend);
+$("fSitu").addEventListener("change",()=>renderPend()); $("busca").addEventListener("input",()=>renderPend());
 $("btnRemoverTudo").addEventListener("click",()=>{st.files=sampleFiles();st.isSample=true;st.f.conta="";refreshFilterOptions();render();persist();showMsg("Planilhas removidas deste navegador.")});
+$("btnYearPdf").addEventListener("click",async()=>{$("btnYearPdf").disabled=true;try{await exportYearPdf()}catch(err){showMsg("Não consegui gerar o relatório: "+err.message,true)}finally{$("btnYearPdf").disabled=false}});
+$("btnYearXlsx").addEventListener("click",async()=>{$("btnYearXlsx").disabled=true;try{await exportYearXlsx()}catch(err){showMsg("Não consegui gerar o relatório: "+err.message,true)}finally{$("btnYearXlsx").disabled=false}});
 $("btnPdf").addEventListener("click",async()=>{$("btnPdf").disabled=true;try{await exportPdf()}catch(err){showMsg("Não consegui gerar o PDF: "+err.message,true)}finally{$("btnPdf").disabled=false}});
 $("btnXlsx").addEventListener("click",async()=>{$("btnXlsx").disabled=true;try{if(window.ExcelJS){try{await exportXlsxPro()}catch(e1){console.error(e1);await exportXlsx()}}else await exportXlsx()}catch(err){showMsg("Não consegui gerar o Excel: "+err.message,true)}finally{$("btnXlsx").disabled=false}});
 const rerenderCharts=()=>{if(!view)return;if(st.view==="analise")renderCharts(view.rs);if(st.view==="visao")renderProj(view.rs);if(st.view==="projecao")renderProjRec(view.rs)};
@@ -1594,6 +1702,7 @@ new MutationObserver(rerenderCharts).observe(document.documentElement,{attribute
     if(!saved||!saved.length){const old=await oldStore();if(old&&old.length) saved=old.map(f=>({...f,fundo:f.fundo||"",fundoAuto:false}))}
     if(saved&&saved.length){try{st.files=revive(saved);st.isSample=false;refreshFilterOptions();render();showView(st.view)}catch(err){st.files=sampleFiles();st.isSample=true;refreshFilterOptions();render();showMsg("Não consegui reabrir as planilhas guardadas. Carregue-as de novo.",true)}}
   }
+  if(!location.hash&&st.isSample) showView("planilhas");
   getDownloads();
 })();
 })();
