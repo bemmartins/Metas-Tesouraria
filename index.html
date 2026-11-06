@@ -333,7 +333,6 @@ footer.foot .by{color:var(--accent)}
       <a class="tab" href="#visao" data-v="visao">Visão geral</a>
       <a class="tab" href="#analise" data-v="analise">Análise</a>
       <a class="tab" href="#pendencias" data-v="pendencias">Pendências <span class="badge" id="bPend"></span></a>
-      <a class="tab" href="#projecao" data-v="projecao">Projeção de receita</a>
       <a class="tab" href="#planilhas" data-v="planilhas">Upload <span class="badge" id="bPlan"></span></a>
     </nav>
     <div class="actions">
@@ -382,7 +381,7 @@ footer.foot .by{color:var(--accent)}
       </div>
       <div class="kpis k4" id="projSum"></div>
       <div id="projWrap"><div class="cbox" style="height:300px"><canvas id="cProj" aria-label="Gráfico de projeção da meta"></canvas></div></div>
-      <p class="note">Linha azul: percentual acumulado até cada mês. Linha tracejada: projeção até o fim do período, mantendo o ritmo e o volume médios dos últimos 3 meses.</p>
+      <p class="note">Linha azul: percentual acumulado até cada mês. Linha tracejada: projeção até dezembro, mantendo o ritmo e o volume médios dos últimos 3 meses.</p>
     </section>
 
     <section class="card">
@@ -451,39 +450,6 @@ footer.foot .by{color:var(--accent)}
       </div>
       <div class="scroll" style="max-height:640px"><table id="tPend"></table></div>
       <p class="note">Clique numa pendência para ver todos os campos da linha. Saldo inicial e linhas-modelo vazias são ignorados.</p>
-    </section>
-  </div>
-
-  <!-- PROJEÇÃO DE RECEITA -->
-  <div class="view" id="v-projecao" hidden>
-    <section class="card">
-      <div class="row">
-        <div><h2>Projeção de receita por natureza</h2><p class="note" style="margin-top:2px">Valores das receitas realizadas mês a mês e projeção dos próximos meses</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button type="button" id="btnYearPdf" class="primary">Relatório do ano (PDF)</button>
-        <button type="button" id="btnYearXlsx">Relatório do ano (Excel)</button>
-        </div>
-        <label for="prBase" style="display:flex;gap:6px;align-items:center;font-size:.85rem;color:var(--muted)">Base da projeção <select id="prBase"><option value="3">Média dos últimos 3 meses</option><option value="6">Média dos últimos 6 meses</option><option value="0">Média do período</option></select></label>
-      </div>
-      <div class="kpis k4" id="prSum"></div>
-      <div class="seg" id="prSub" role="tablist" aria-label="Subtópicos da projeção" style="justify-self:start">
-        <button type="button" data-prsub="tres" aria-pressed="true">Próximos 3 meses</button>
-        <button type="button" data-prsub="mensal" aria-pressed="false">Gráfico mensal</button>
-        <button type="button" data-prsub="natureza" aria-pressed="false">Detalhe por natureza</button>
-      </div>
-    </section>
-    <section class="card" data-sub="tres">
-      <div class="row"><h2 id="hPR3">Projeção dos próximos 3 meses por natureza</h2><span class="note" id="prBaseLbl"></span></div>
-      <div class="scroll" style="max-height:none"><table id="tPR3"></table></div>
-    </section>
-    <section class="card" data-sub="mensal" hidden>
-      <div class="row"><h2>Realizado e projetado por mês</h2><span class="note">As 7 maiores naturezas; as demais em "Outras"</span></div>
-      <div class="cbox" style="height:340px"><canvas id="cPR" aria-label="Gráfico de receita realizada e projetada por natureza"></canvas></div>
-    </section>
-    <section class="card" data-sub="natureza" hidden>
-      <div class="row"><h2>Detalhe por natureza da receita</h2><span class="note">Clique numa natureza para ver mês a mês</span></div>
-      <div class="scroll" style="max-height:none"><table id="tPR"></table></div>
-      <p class="note" id="prNote"></p>
     </section>
   </div>
 
@@ -1012,12 +978,12 @@ function projData(rs,metric){
   const last3=real.slice(-3).filter(x=>x.t); const vol=last3.reduce((a,x)=>a+x.t,0)/Math.max(1,last3.length);
   const pace=last3.reduce((a,x)=>a+x.y,0)/Math.max(1,last3.reduce((a,x)=>a+x.t,0));
   // horizonte: até dezembro do último ano (mínimo 2 meses à frente)
-  let n=12-lm; if(n<2) n+=12; n=Math.min(n,12);
+  const n=Math.max(0,12-lm); // projeta só até dezembro do ano dos dados
   const fut=[]; let fy=cy,ft=ct,py=ly,pm=lm;
   for(let i=0;i<n;i++){pm++;if(pm>12){pm=1;py++};fy+=vol*pace;ft+=vol;fut.push({k:`${py}-${String(pm).padStart(2,"0")}`,cum:fy/ft})}
   const V=vol*n; const reqPace=V?(meta/100*(ct+V)-cy)/V:Infinity;
-  const endK=fut[fut.length-1].k;
-  return {meta,real,fut,pace,vol,reqPace,now:cy/ct,end:fut[fut.length-1].cum,endK,cy,ct,pend:ct-cy,isR,n};
+  const endK=n?fut[n-1].k:ks[ks.length-1];
+  return {meta,real,fut,pace,vol,reqPace,now:cy/ct,end:n?fut[n-1].cum:cy/ct,endK,cy,ct,pend:ct-cy,isR,n};
 }
 function renderProj(rs){
   const sec=$("secProj"); if(!sec) return;
@@ -1029,11 +995,12 @@ function renderProj(rs){
   $("projWrap").hidden=false;
   const okEnd=P.end>=P.meta/100, okNow=P.now>=P.meta/100, unit=P.isR?"receitas":"lançamentos";
   let need;
-  if(P.reqPace<=P.pace) need={t:"O ritmo atual basta",d:`Para fechar ${mlabel(P.endK)} na meta, cada mês precisa de ${fmtPct(Math.max(0,P.reqPace))}; o ritmo atual é ${fmtPct(P.pace)}.`,c:"good"};
+  if(!P.n) need={t:okNow?"Meta batida no ano":"Ano fechou abaixo da meta",d:"Os dados já vão até dezembro; não há meses a projetar.",c:okNow?"good":"bad"};
+  else if(P.reqPace<=P.pace) need={t:"O ritmo atual basta",d:`Para fechar ${mlabel(P.endK)} na meta, cada mês precisa de ${fmtPct(Math.max(0,P.reqPace))}; o ritmo atual é ${fmtPct(P.pace)}.`,c:"good"};
   else if(P.reqPace<=1) need={t:`Precisa subir para ${fmtPct(P.reqPace)} ao mês`,d:`Hoje o ritmo é ${fmtPct(P.pace)} ao mês. A diferença é de ${fmtPP(P.reqPace-P.pace)} p.p.`,c:"bad"};
   else {const gap=Math.ceil(P.meta/100*(P.ct+P.vol*P.n)-P.cy-P.vol*P.n);need={t:`Precisa resolver ${fmtInt(gap)} pendentes antigos`,d:`Mesmo com 100% nos próximos meses, só bate a meta resolvendo ${unit} já em aberto.`,c:"bad"}}
   box.innerHTML=`<div class="kpi ${okNow?"good":"bad"}"><small>Hoje</small><div>${fmtPct(P.now)}</div><span class="g100s">${fmtInt(P.cy)} de ${fmtInt(P.ct)} ${unit}</span></div>
-    <div class="kpi ${okEnd?"good":"bad"}"><small>Projeção para ${mlabel(P.endK)}</small><div>${fmtPct(P.end)}</div><span class="g100s">${okEnd?"dentro":"abaixo"} da meta de ${P.meta}%</span></div>
+    <div class="kpi ${okEnd?"good":"bad"}"><small>${P.n?"Projeção para "+mlabel(P.endK):"Fechamento "+mlabel(P.endK)}</small><div>${fmtPct(P.end)}</div><span class="g100s">${okEnd?"dentro":"abaixo"} da meta de ${P.meta}%</span></div>
     <div class="kpi"><small>Ritmo dos últimos 3 meses</small><div>${fmtPct(P.pace)}</div><span class="g100s">~${fmtInt(Math.round(P.vol))} ${unit} por mês</span></div>
     <div class="kpi ${need.c}"><small>Para fechar o período na meta</small><div style="font-size:.95rem;font-family:var(--font-body)">${need.t}</div><span class="g100s">${need.d}</span></div>`;
   if(!window.Chart) return;
@@ -1579,16 +1546,6 @@ async function exportXlsxPro(){
       semId.map(x=>[x.cl,fundoS(x.file.fundo),x.d||null,x.nat||"(sem natureza)",x.doc,x.hist,x.val,x.situ,x.file.label,x.line]),
       {tab:XC.warn,empty:"Todas as receitas têm identificação",summary:semId.length?`${fmtInt(semId.length)} receitas vazias · ${fmtBRL(R.ve)}`:"Todas as receitas têm identificação",sumColor:semId.length?XC.warn:XC.ok,totals:[null,null,null,null,null,null,"sum",null,null,null]});
   }
-  // Projeção de receita
-  const PRd=projRecData(rs);
-  if(PRd) table("Projeção receita",`Projeção de receita por natureza até ${mlabel(PRd.fut[PRd.fut.length-1])}`,[
-      {h:"Natureza da receita",w:52,wrap:true,bold:true},{h:"Receitas",w:10,fmt:"int"},{h:"Realizado",w:19,fmt:"brl"},{h:"Média mensal",w:18,fmt:"brl"},{h:"Projeção",w:19,fmt:"brl"},{h:"Total projetado",w:20,fmt:"brl"},{h:"% do total",w:11,fmt:"pct"},{h:"Tendência",w:11,fmt:"pct",color:v=>typeof v==="number"?(v>=0?XC.ok:XC.bad):null}],
-      PRd.list.map(x=>[x.label,x.n,+x.real.toFixed(2),+x.avg.toFixed(2),+x.proj.toFixed(2),+x.total.toFixed(2),PRd.total?x.total/PRd.total:null,x.trend]),
-      {tab:XC.sky,summary:`Realizado ${fmtBRL(PRd.real)} · projeção ${fmtBRL(PRd.proj)} · total ${fmtBRL(PRd.total)} (base: ${PRd.base===0?"média do período":"média dos últimos "+PRd.base+" meses"})`,totals:[null,"sum","sum","sum","sum","sum",null,null]});
-  if(PRd) table("Projeção 3 meses",`Projeção dos próximos 3 meses por natureza · ${mlabel(PRd.fut3[0])} a ${mlabel(PRd.fut3[2])}`,[
-      {h:"Natureza da receita",w:52,wrap:true,bold:true},...PRd.fut3.map(k=>({h:mlabel(k),w:18,fmt:"brl"})),{h:"Total 3 meses",w:20,fmt:"brl"},{h:"% do total",w:11,fmt:"pct"}],
-      [...PRd.list].sort((p,q)=>q.avg-p.avg).map(x=>[x.label,+x.avg.toFixed(2),+x.avg.toFixed(2),+x.avg.toFixed(2),+(x.avg*3).toFixed(2),(()=>{const t=PRd.list.reduce((a,y)=>a+y.avg,0);return t?x.avg/t:null})()]),
-      {tab:XC.sky,summary:`Total projetado em 3 meses: ${fmtBRL(PRd.list.reduce((a,y)=>a+y.avg,0)*3)} (base: ${PRd.base===0?"média do período":"média dos últimos "+PRd.base+" meses"})`,totals:[null,"sum","sum","sum","sum",null]});
   // Outras abas
   extraRows.forEach(e=>{const pend=e.x.records.filter(x=>x.k!=="yes");if(!pend.length)return;const nm=("Pend. "+e.x.name).slice(0,31);if(wb.getWorksheet(nm))return;
     table(nm,`Aba ${e.x.name}  ·  ${fmtInt(pend.length)} pendentes`,[
@@ -1627,7 +1584,7 @@ function showMsg(t,err){const m=$("msg");m.hidden=!t;m.textContent=t;m.className
 function removeFile(i){st.files.splice(i,1);st.f.conta="";if(!st.files.length){st.files=sampleFiles();st.isSample=true}refreshFilterOptions();render();persist()}
 
 /* ---------- páginas ---------- */
-const VIEWS=["visao","analise","pendencias","projecao","planilhas"];
+const VIEWS=["visao","analise","pendencias","planilhas"];
 function go(v){if(location.hash!=="#"+v)location.hash=v;else showView(v)}
 function showView(v){
   if(!VIEWS.includes(v)) v="visao";
@@ -1724,7 +1681,7 @@ const VTITLE={visao:null,analise:"Análise",pendencias:"Pendências",projecao:"P
 function pageHead(v){
   const d=new Date(),h=d.getHours();
   $("phDate").textContent=titleCase(d.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"}));
-  $("phTitle").textContent=VTITLE[v]||(h<12?"Bom dia":h<18?"Boa tarde":"Boa noite")+", GERTE";
+  $("phTitle").textContent=VTITLE[v]||(h<12?"Bom dia":h<18?"Boa tarde":"Boa noite");
 }
 function animateIn(v){
   const reduce=(()=>{try{return matchMedia("(prefers-reduced-motion: reduce)").matches}catch(_){return true}})();
@@ -1810,14 +1767,11 @@ $("btnLimparF").addEventListener("click",()=>{st.f={fundo:"",conta:"",de:"",ate:
 const metaIn=(id,key)=>$(id).addEventListener("input",e=>{const v=parseFloat(e.target.value);if(!isNaN(v)&&v>=0&&v<=100){st[key]=v;try{localStorage.setItem("mt-"+key,String(v))}catch(_){}render()}});
 metaIn("meta","meta"); metaIn("metaR","metaR");
 $("goPlan").addEventListener("click",()=>go("planilhas"));
-$("prBase").addEventListener("change",()=>view&&renderProjRec(view.rs));
 $("recGrp").addEventListener("change",()=>view&&renderRec(view.rs));
 $("recAll").addEventListener("click",()=>{const l=view.rs.filter(r=>r.isRec&&!r.hasId);openList("Receitas sem identificação",fmtInt(l.length)+" lançamentos",l)});
 $("dClose").addEventListener("click",closeDrawer); $("scrim").addEventListener("click",closeDrawer);
 $("fSitu").addEventListener("change",()=>renderPend()); $("busca").addEventListener("input",()=>renderPend());
 $("btnRemoverTudo").addEventListener("click",()=>{st.files=sampleFiles();st.isSample=true;st.f.conta="";refreshFilterOptions();render();persist();showMsg("Planilhas removidas deste navegador.")});
-$("btnYearPdf").addEventListener("click",async()=>{$("btnYearPdf").disabled=true;try{await exportYearPdf()}catch(err){showMsg("Não consegui gerar o relatório: "+err.message,true)}finally{$("btnYearPdf").disabled=false}});
-$("btnYearXlsx").addEventListener("click",async()=>{$("btnYearXlsx").disabled=true;try{await exportYearXlsx()}catch(err){showMsg("Não consegui gerar o relatório: "+err.message,true)}finally{$("btnYearXlsx").disabled=false}});
 $("btnPdf").addEventListener("click",async()=>{$("btnPdf").disabled=true;try{await exportPdf()}catch(err){showMsg("Não consegui gerar o PDF: "+err.message,true)}finally{$("btnPdf").disabled=false}});
 $("btnXlsx").addEventListener("click",async()=>{$("btnXlsx").disabled=true;try{if(window.ExcelJS){try{await exportXlsxPro()}catch(e1){console.error(e1);await exportXlsx()}}else await exportXlsx()}catch(err){showMsg("Não consegui gerar o Excel: "+err.message,true)}finally{$("btnXlsx").disabled=false}});
 const rerenderCharts=()=>{if(!view)return;if(st.view==="analise")renderCharts(view.rs);if(st.view==="visao")renderProj(view.rs);if(st.view==="projecao")renderProjRec(view.rs)};
